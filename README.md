@@ -61,7 +61,7 @@ Please refer to the initial [ScanRefer](https://daveredrum.github.io/ScanRefer/)
 You could use other PointNet++ implementations for the lower version (<=1.2.0) of PyTorch.
 
 ```shell
-conda install pytorch==1.2.0 torchvision==0.4.0 cudatoolkit=10.0 -c pytorch
+conda install pytorch torchvision torchaudio cudatoolkit=11.1 -c pytorch-lts -c nvidia
 ```
 
 Install the necessary packages listed out in `requirements.txt`:
