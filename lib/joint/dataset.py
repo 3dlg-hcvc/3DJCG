@@ -771,6 +771,7 @@ class ScannetReferenceDataset(ReferenceDataset):
         data_dict = {}
         data_dict["unk"] = unk.astype(np.float32)
         data_dict["istrain"] = istrain
+        data_dict["scene_id"] = scene_id
         data_dict["lang_num"] = np.array(lang_num).astype(np.int64)
         data_dict["point_clouds"] = point_cloud.astype(np.float32) # point cloud data including features
         data_dict["lang_feat"] = lang_feat.astype(np.float32) # language feature vectors

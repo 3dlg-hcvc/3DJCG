@@ -2,8 +2,7 @@ import os
 import sys
 from easydict import EasyDict
 
-BASE_DIR = os.path.dirname(os.path.abspath("../"))
-ROOT_DIR = os.path.dirname(os.path.dirname(BASE_DIR))
+ROOT_DIR = os.path.abspath("/localhome/yza440/Research/3DJCG")
 CONF = EasyDict()
 
 # path

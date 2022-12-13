@@ -17,7 +17,6 @@ from copy import deepcopy
 sys.path.append(os.path.join(os.getcwd())) # HACK add the root folder
 from lib.configs.config_joint import CONF
 from lib.joint.dataset import ScannetReferenceDataset
-from lib.joint.solver import Solver
 from lib.ap_helper.ap_helper_fcos import APCalculator, parse_predictions, parse_groundtruths
 from lib.loss_helper.loss_joint import get_joint_loss
 from lib.joint.eval_ground import get_eval
@@ -158,8 +157,8 @@ def eval_ref(args):
     } if not args.no_nms else None
 
     # random seeds
-    seeds = [args.seed] + [2 * i for i in range(args.repeat - 1)]
-
+    # seeds = [args.seed] + [2 * i for i in range(args.repeat - 1)]
+    seeds = [args.seed]
     # evaluate
     print("evaluating...")
     score_path = os.path.join(CONF.PATH.OUTPUT, args.folder, "scores.p")
@@ -178,6 +177,10 @@ def eval_ref(args):
             torch.backends.cudnn.benchmark = False
             np.random.seed(seed)
 
+            # scanrefer++ support
+            final_output = {}
+            mem_hash = {}
+
             print("generating the scores for seed {}...".format(seed))
             ref_acc = []
             ious = []
@@ -186,8 +189,15 @@ def eval_ref(args):
             lang_acc = []
             predictions = {}
             for data in tqdm(dataloader):
+                # scanrefer++ support
+                for scene_id in data["scene_id"]:
+                    if scene_id not in final_output:
+                        final_output[scene_id] = []
+
                 for key in data:
-                    data[key] = data[key].cuda()
+                    if key != "scene_id":
+                        data[key] = data[key].cuda()
+                # end
 
                 # feed
                 with torch.no_grad():
@@ -214,7 +224,9 @@ def eval_ref(args):
                         use_oracle=args.use_oracle,
                         use_cat_rand=args.use_cat_rand,
                         use_best=args.use_best,
-                        post_processing=POST_DICT
+                        post_processing=POST_DICT,
+                        final_output=final_output,  # scanrefer++ support
+                        mem_hash=mem_hash  # scanrefer++ support
                     )
 
                     ref_acc += data["ref_acc"]
@@ -247,6 +259,15 @@ def eval_ref(args):
             # save the last predictions
             with open(pred_path, "wb") as f:
                 pickle.dump(predictions, f)
+
+            # scanrefer+= support
+            for key, value in final_output.items():
+                for query in value:
+                    query["aabbs"] = [item.tolist() for item in query["aabbs"]]
+                os.makedirs("scanrefer++_test", exist_ok=True)
+                with open(f"scanrefer++_test/{key}.json", "w") as f:
+                    json.dump(value, f)
+            # end
 
             # save to global
             ref_acc_all.append(ref_acc)
