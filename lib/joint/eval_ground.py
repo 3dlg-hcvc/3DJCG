@@ -96,7 +96,8 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
     data_dict["ref_acc"] = ref_acc.cpu().numpy().tolist()
 
     # scanrefer++ support, use threshold to filter predictions instead of argmax
-    pred_ref_mul_obj_mask = (data_dict["cluster_ref"] * pred_masks) > 5
+    #pred_ref_mul_obj_mask = (data_dict["cluster_ref"] * pred_masks) > 5
+    pred_ref_mul_obj_mask = torch.nn.functional.softmax(data_dict["cluster_ref"], dim=1) > 0.1
     # end
 
     # compute localization metricens

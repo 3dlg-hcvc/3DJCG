@@ -27,7 +27,7 @@ DC = ScannetDatasetConfig()
 MAX_NUM_OBJ = 128
 MEAN_COLOR_RGB = np.array([109.8, 97.2, 83.8])
 OBJ_CLASS_IDS = np.array([3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40]) # exclude wall (1), floor (2), ceiling (22)
-
+SCANREFER_ENHANCE = True
 # data path
 SCANNET_V2_TSV = os.path.join(CONF.PATH.SCANNET_META, "scannetv2-labels.combined.tsv")
 # SCANREFER_VOCAB = os.path.join(CONF.PATH.DATA, "ScanRefer_vocabulary.json")
@@ -495,6 +495,11 @@ class ScannetReferenceDataset(ReferenceDataset):
         scene_id = self.scanrefer_new[idx][0]["scene_id"]
 
         object_id_list = []
+
+        # scanrefer++ support
+        multi_obj_ids_list = []
+        # end
+
         object_name_list = []
         ann_id_list = []
 
@@ -512,9 +517,19 @@ class ScannetReferenceDataset(ReferenceDataset):
         ground_main_lang_len_list = []
         ground_first_obj_list = []
 
+        multi_ref_box_label_list = []
+
+        # scanrefer++
+        gt_box_num_list = []
+        # end
+
         for i in range(self.lang_num_max):
             if i < lang_num:
                 object_id = int(self.scanrefer_new[idx][i]["object_id"])
+                if SCANREFER_ENHANCE:
+                    # scanrefer++ support
+                    object_ids = self.scanrefer_new[idx][i]["object_ids"]
+                    # end
                 object_name = " ".join(self.scanrefer_new[idx][i]["object_name"].split("_"))
                 ann_id = self.scanrefer_new[idx][i]["ann_id"]
 
@@ -535,6 +550,8 @@ class ScannetReferenceDataset(ReferenceDataset):
                 ground_first_obj = self.ground_lang_main[scene_id][str(object_id)][ann_id]["first_obj"]
 
             object_id_list.append(object_id)
+            if SCANREFER_ENHANCE:
+                multi_obj_ids_list.append(object_ids)
             object_name_list.append(object_name)
             ann_id_list.append(ann_id)
 
@@ -691,15 +708,28 @@ class ScannetReferenceDataset(ReferenceDataset):
 
         # construct the reference target label for each bbox
         for j in range(self.lang_num_max):
-            ref_box_label = np.zeros(MAX_NUM_OBJ)
+            ref_box_label = np.zeros(MAX_NUM_OBJ, dtype=bool)
+
+            # scanrefer++ support
+            multi_ref_box_label = np.zeros(MAX_NUM_OBJ, dtype=bool)
+            if object_id_list[j] == -1 and SCANREFER_ENHANCE:
+                ref_box_label_list.append(ref_box_label)
+                ref_heading_class_label_list.append(angle_classes[i])
+                ref_heading_residual_label_list.append(angle_residuals[i])
+                gt_box_num_list.append(len(multi_obj_ids_list[j]))
+                multi_ref_box_label_list.append(multi_ref_box_label)
+                continue
+            # end
+
+
             for i, gt_id in enumerate(instance_bboxes[:num_bbox,-1]):
                 if gt_id == object_id_list[j]:
-                    ref_box_label[i] = 1
-                    ref_center_label = target_bboxes[i, 0:3]
+                    ref_box_label[i] = True
+                    # ref_center_label = target_bboxes[i, 0:3]
                     ref_heading_class_label = angle_classes[i]
                     ref_heading_residual_label = angle_residuals[i]
-                    ref_size_class_label = size_classes[i]
-                    ref_size_residual_label = size_residuals[i]
+                    #ref_size_class_label = size_classes[i]
+                    #ref_size_residual_label = size_residuals[i]
 
                     # construct ground truth box corner coordinates
                     ref_obb = DC.param2obb(ref_center_label, ref_heading_class_label, ref_heading_residual_label,
@@ -710,9 +740,17 @@ class ScannetReferenceDataset(ReferenceDataset):
                     ref_center_label_list.append(ref_center_label)
                     ref_heading_class_label_list.append(ref_heading_class_label)
                     ref_heading_residual_label_list.append(ref_heading_residual_label)
-                    ref_size_class_label_list.append(ref_size_class_label)
-                    ref_size_residual_label_list.append(ref_size_residual_label)
+                    #ref_size_class_label_list.append(ref_size_class_label)
+                    #ref_size_residual_label_list.append(ref_size_residual_label)
                     ref_box_corner_label_list.append(ref_box_corner_label)
+                if SCANREFER_ENHANCE:
+
+                    if gt_id in multi_obj_ids_list[j]:
+                        multi_ref_box_label[i] = True
+            if SCANREFER_ENHANCE:
+                gt_box_num_list.append(len(multi_obj_ids_list[j]))
+                multi_ref_box_label_list.append(multi_ref_box_label)
+
         ref_num = len(ref_box_label_list)
         for j in range(self.lang_num_max-ref_num):
             ref_box_label_list.append(ref_box_label)
@@ -816,10 +854,10 @@ class ScannetReferenceDataset(ReferenceDataset):
         data_dict["lang_feat_list"] = np.array(lang_feat_list).astype(np.float32)  # language feature vectors
         data_dict["lang_len_list"] = np.array(lang_len_list).astype(np.int64)  # length of each description
         data_dict["lang_ids_list"] = np.array(lang_ids_list).astype(np.int64)
-        data_dict["main_lang_feat_list"] = np.array(main_lang_feat_list).astype(np.float32)  # main language feature vectors
+        # data_dict["main_lang_feat_list"] = np.array(main_lang_feat_list).astype(np.float32)  # main language feature vectors
         data_dict["main_lang_len_list"] = np.array(main_lang_len_list).astype(np.int64)  # length of each main description
         data_dict["first_obj_list"] = np.array(first_obj_list).astype(np.int64)
-        data_dict["unk_list"] = np.array(unk_list).astype(np.float32)
+        # data_dict["unk_list"] = np.array(unk_list).astype(np.float32)
 
         data_dict["ground_lang_feat_list"] = np.array(ground_lang_feat_list).astype(np.float32)  # language feature vectors
         data_dict["ground_lang_len_list"] = np.array(ground_lang_len_list).astype(np.int64)  # length of each description
@@ -828,15 +866,20 @@ class ScannetReferenceDataset(ReferenceDataset):
         data_dict["ground_first_obj_list"] = np.array(ground_first_obj_list).astype(np.int64)
 
         data_dict["ref_box_label_list"] = np.array(ref_box_label_list).astype(np.int64)  # 0/1 reference labels for each object bbox
-        data_dict["ref_center_label_list"] = np.array(ref_center_label_list).astype(np.float32)
+        # data_dict["ref_center_label_list"] = np.array(ref_center_label_list).astype(np.float32)
         data_dict["ref_heading_class_label_list"] = np.array(ref_heading_class_label_list).astype(np.int64)
         data_dict["ref_heading_residual_label_list"] = np.array(ref_heading_residual_label_list).astype(np.int64)
-        data_dict["ref_size_class_label_list"] = np.array(ref_size_class_label_list).astype(np.int64)
-        data_dict["ref_size_residual_label_list"] = np.array(ref_size_residual_label_list).astype(np.float32)
+        # data_dict["ref_size_class_label_list"] = np.array(ref_size_class_label_list).astype(np.int64)
+        # data_dict["ref_size_residual_label_list"] = np.array(ref_size_residual_label_list).astype(np.float32)
         data_dict["ref_box_corner_label_list"] = np.array(ref_box_corner_label_list).astype(np.float64)
         data_dict["object_id_list"] = np.array(object_id_list).astype(np.int64)
         data_dict["ann_id_list"] = np.array(ann_id_list).astype(np.int64)
         data_dict["object_cat_list"] = np.array(object_cat_list).astype(np.int64)
+
+        data_dict["gt_box_num_list"] = np.array(gt_box_num_list).astype(np.int32)
+
+        if SCANREFER_ENHANCE:
+            data_dict["multi_ref_box_label_list"] = np.array(multi_ref_box_label_list)
 
         unique_multiple_list = []
         for i in range(self.lang_num_max):
