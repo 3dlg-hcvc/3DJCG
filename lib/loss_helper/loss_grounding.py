@@ -47,22 +47,26 @@ def compute_reference_loss(data_dict, config, no_reference=False):
     if not SCANREFER_ENHANCE:
         box_mask = data_dict["ref_box_label_list"].to(torch.float32)
         gt_center_list = torch.einsum("abc,adb->adc", data_dict["center_label"], box_mask).cpu().numpy()
-        gt_size_class_list = torch.einsum("ab,acb->ac", data_dict["size_class_label"].to(torch.float32), box_mask).to(torch.long).cpu().numpy()
+        gt_size_class_list = torch.einsum("ab,acb->ac", data_dict["size_class_label"].to(torch.float32), box_mask).to(
+            torch.long).cpu().numpy()
         gt_size_residual_list = torch.einsum("abc,adb->adc", data_dict["size_residual_label"], box_mask).cpu().numpy()
-        gt_heading_class_list = torch.einsum("ab,acb->ac", data_dict["heading_class_label"].to(torch.float32), box_mask).to(torch.long).cpu().numpy()
-        gt_heading_residual_list = torch.einsum("ab,acb->ac", data_dict["heading_residual_label"].to(torch.float32), box_mask).to(torch.long).cpu().numpy()
+        gt_heading_class_list = torch.einsum("ab,acb->ac", data_dict["heading_class_label"].to(torch.float32),
+                                             box_mask).to(torch.long).cpu().numpy()
+        gt_heading_residual_list = torch.einsum("ab,acb->ac", data_dict["heading_residual_label"].to(torch.float32),
+                                                box_mask).to(torch.long).cpu().numpy()
+        # gt_center_list = data_dict['ref_center_label_list'].cpu().numpy()  # (B,3)
+        # gt_heading_class_list = data_dict['ref_heading_class_label_list'].cpu().numpy()  # B
+        # gt_heading_residual_list = data_dict['ref_heading_residual_label_list'].cpu().numpy()  # B
+        # gt_size_class_list = data_dict['ref_size_class_label_list'].cpu().numpy()  # B
+        # gt_size_residual_list = data_dict['ref_size_residual_label_list'].cpu().numpy()  # B,3
     else:
         box_mask = data_dict["multi_ref_box_label_list"]
         gt_box_num = data_dict["gt_box_num_list"].cpu().numpy()
 
-    # gt_center_list = data_dict['ref_center_label_list'].cpu().numpy()  # (B,3)
-    # gt_heading_class_list = data_dict['ref_heading_class_label_list'].cpu().numpy()  # B
-    # gt_heading_residual_list = data_dict['ref_heading_residual_label_list'].cpu().numpy()  # B
-    # gt_size_class_list = data_dict['ref_size_class_label_list'].cpu().numpy()  # B
-    # gt_size_residual_list = data_dict['ref_size_residual_label_list'].cpu().numpy()  # B,3
+
     # convert gt bbox parameters to bbox corners
     batch_size, num_proposals = data_dict['aggregated_vote_features'].shape[:2]
-    batch_size, len_nun_max = gt_center_list.shape[:2]
+    batch_size, len_nun_max = data_dict["multi_ref_box_label_list"].shape[:2]
     lang_num = data_dict["lang_num"]
     max_iou_rate_25 = 0
     max_iou_rate_5 = 0

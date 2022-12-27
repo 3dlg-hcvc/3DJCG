@@ -14,29 +14,29 @@ from models.transformer.attention import MultiHeadAttention
 # constants
 DC = ScannetDatasetConfig()
 
-def select_target(data_dict):
-    # predicted bbox
-    pred_bbox = data_dict["pred_bbox_corner"] # batch_size, num_proposals, 8, 3
-    batch_size, num_proposals, _, _ = pred_bbox.shape
-
-    # ground truth bbox
-    gt_bbox = data_dict["ref_box_corner_label"].float() # batch_size, 8, 3
-
-    target_ids = []
-    target_ious = []
-    for i in range(batch_size):
-        # convert the bbox parameters to bbox corners
-        pred_bbox_batch = pred_bbox[i] # num_proposals, 8, 3
-        gt_bbox_batch = gt_bbox[i].unsqueeze(0).repeat(num_proposals, 1, 1) # num_proposals, 8, 3
-        ious = box3d_iou_batch_tensor(pred_bbox_batch, gt_bbox_batch)
-        target_id = ious.argmax().item() # 0 ~ num_proposals - 1
-        target_ids.append(target_id)
-        target_ious.append(ious[target_id])
-
-    target_ids = torch.LongTensor(target_ids).cuda() # batch_size
-    target_ious = torch.FloatTensor(target_ious).cuda() # batch_size
-
-    return target_ids, target_ious
+# def select_target(data_dict):
+#     # predicted bbox
+#     pred_bbox = data_dict["pred_bbox_corner"] # batch_size, num_proposals, 8, 3
+#     batch_size, num_proposals, _, _ = pred_bbox.shape
+#
+#     # ground truth bbox
+#     gt_bbox = data_dict["ref_box_corner_label"].float() # batch_size, 8, 3
+#
+#     target_ids = []
+#     target_ious = []
+#     for i in range(batch_size):
+#         # convert the bbox parameters to bbox corners
+#         pred_bbox_batch = pred_bbox[i] # num_proposals, 8, 3
+#         gt_bbox_batch = gt_bbox[i].unsqueeze(0).repeat(num_proposals, 1, 1) # num_proposals, 8, 3
+#         ious = box3d_iou_batch_tensor(pred_bbox_batch, gt_bbox_batch)
+#         target_id = ious.argmax().item() # 0 ~ num_proposals - 1
+#         target_ids.append(target_id)
+#         target_ious.append(ious[target_id])
+#
+#     target_ids = torch.LongTensor(target_ids).cuda() # batch_size
+#     target_ious = torch.FloatTensor(target_ious).cuda() # batch_size
+#
+#     return target_ids, target_ious
 
 def select_multi_target(data_dict):
     # predicted bbox

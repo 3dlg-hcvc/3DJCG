@@ -726,25 +726,24 @@ class ScannetReferenceDataset(ReferenceDataset):
                 if gt_id == object_id_list[j]:
                     ref_box_label[i] = True
                     # ref_center_label = target_bboxes[i, 0:3]
-                    ref_heading_class_label = angle_classes[i]
-                    ref_heading_residual_label = angle_residuals[i]
-                    #ref_size_class_label = size_classes[i]
-                    #ref_size_residual_label = size_residuals[i]
+                    # ref_heading_class_label = angle_classes[i]
+                    # ref_heading_residual_label = angle_residuals[i]
+                    # ref_size_class_label = size_classes[i]
+                    # ref_size_residual_label = size_residuals[i]
 
                     # construct ground truth box corner coordinates
-                    ref_obb = DC.param2obb(ref_center_label, ref_heading_class_label, ref_heading_residual_label,
-                                    ref_size_class_label, ref_size_residual_label)
-                    ref_box_corner_label = get_3d_box(ref_obb[3:6], ref_obb[6], ref_obb[0:3])
+                    # ref_obb = DC.param2obb(ref_center_label, ref_heading_class_label, ref_heading_residual_label,
+                    #                 ref_size_class_label, ref_size_residual_label)
+                    # ref_box_corner_label = get_3d_box(ref_obb[3:6], ref_obb[6], ref_obb[0:3])
 
                     ref_box_label_list.append(ref_box_label)
-                    ref_center_label_list.append(ref_center_label)
-                    ref_heading_class_label_list.append(ref_heading_class_label)
-                    ref_heading_residual_label_list.append(ref_heading_residual_label)
-                    #ref_size_class_label_list.append(ref_size_class_label)
-                    #ref_size_residual_label_list.append(ref_size_residual_label)
-                    ref_box_corner_label_list.append(ref_box_corner_label)
+                    # ref_center_label_list.append(ref_center_label)
+                    # ref_heading_class_label_list.append(ref_heading_class_label)
+                    # ref_heading_residual_label_list.append(ref_heading_residual_label)
+                    # ref_size_class_label_list.append(ref_size_class_label)
+                    # ref_size_residual_label_list.append(ref_size_residual_label)
+                    # ref_box_corner_label_list.append(ref_box_corner_label)
                 if SCANREFER_ENHANCE:
-
                     if gt_id in multi_obj_ids_list[j]:
                         multi_ref_box_label[i] = True
             if SCANREFER_ENHANCE:
@@ -752,6 +751,7 @@ class ScannetReferenceDataset(ReferenceDataset):
                 multi_ref_box_label_list.append(multi_ref_box_label)
 
         ref_num = len(ref_box_label_list)
+        assert self.lang_num_max-ref_num == 0
         for j in range(self.lang_num_max-ref_num):
             ref_box_label_list.append(ref_box_label)
             ref_center_label_list.append(ref_center_label)
@@ -835,15 +835,15 @@ class ScannetReferenceDataset(ReferenceDataset):
         data_dict["pcl_color"] = pcl_color
 
         data_dict["ref_box_label"] = ref_box_label.astype(np.int64) # 0/1 reference labels for each object bbox
-        data_dict["ref_center_label"] = ref_center_label.astype(np.float32)
-        data_dict["ref_heading_class_label"] = np.array(int(ref_heading_class_label)).astype(np.int64)
-        data_dict["ref_heading_residual_label"] = np.array(int(ref_heading_residual_label)).astype(np.int64)
-        data_dict["ref_size_class_label"] = np.array(int(ref_size_class_label)).astype(np.int64)
-        data_dict["ref_size_residual_label"] = ref_size_residual_label.astype(np.float32)
-        data_dict["ref_box_corner_label"] = ref_box_corner_label.astype(np.float64) # target box corners NOTE type must be double
-        data_dict["gt_box_corner_label"] = gt_box_corner_label.astype(np.float64) # all GT box corners NOTE type must be double
-        data_dict["gt_box_masks"] = gt_box_masks.astype(np.int64) # valid bbox masks
-        data_dict["gt_box_object_ids"] = gt_box_object_ids.astype(np.int64) # valid bbox object ids
+        # data_dict["ref_center_label"] = ref_center_label.astype(np.float32)
+        # data_dict["ref_heading_class_label"] = np.array(int(ref_heading_class_label)).astype(np.int64)
+        # data_dict["ref_heading_residual_label"] = np.array(int(ref_heading_residual_label)).astype(np.int64)
+        # data_dict["ref_size_class_label"] = np.array(int(ref_size_class_label)).astype(np.int64)
+        # data_dict["ref_size_residual_label"] = ref_size_residual_label.astype(np.float32)
+        # data_dict["ref_box_corner_label"] = ref_box_corner_label.astype(np.float64) # target box corners NOTE type must be double
+        # data_dict["gt_box_corner_label"] = gt_box_corner_label.astype(np.float64) # all GT box corners NOTE type must be double
+        # data_dict["gt_box_masks"] = gt_box_masks.astype(np.int64) # valid bbox masks
+        # data_dict["gt_box_object_ids"] = gt_box_object_ids.astype(np.int64) # valid bbox object ids
         data_dict["object_id"] = np.array(int(object_id)).astype(np.int64)
         data_dict["ann_id"] = np.array(int(ann_id)).astype(np.int64)
         data_dict["object_cat"] = np.array(object_cat).astype(np.int64)
@@ -866,12 +866,12 @@ class ScannetReferenceDataset(ReferenceDataset):
         data_dict["ground_first_obj_list"] = np.array(ground_first_obj_list).astype(np.int64)
 
         data_dict["ref_box_label_list"] = np.array(ref_box_label_list).astype(np.int64)  # 0/1 reference labels for each object bbox
-        # data_dict["ref_center_label_list"] = np.array(ref_center_label_list).astype(np.float32)
-        data_dict["ref_heading_class_label_list"] = np.array(ref_heading_class_label_list).astype(np.int64)
-        data_dict["ref_heading_residual_label_list"] = np.array(ref_heading_residual_label_list).astype(np.int64)
-        # data_dict["ref_size_class_label_list"] = np.array(ref_size_class_label_list).astype(np.int64)
-        # data_dict["ref_size_residual_label_list"] = np.array(ref_size_residual_label_list).astype(np.float32)
-        data_dict["ref_box_corner_label_list"] = np.array(ref_box_corner_label_list).astype(np.float64)
+        #data_dict["ref_center_label_list"] = np.array(ref_center_label_list).astype(np.float32)
+        #data_dict["ref_heading_class_label_list"] = np.array(ref_heading_class_label_list).astype(np.int64)
+        #data_dict["ref_heading_residual_label_list"] = np.array(ref_heading_residual_label_list).astype(np.int64)
+        #data_dict["ref_size_class_label_list"] = np.array(ref_size_class_label_list).astype(np.int64)
+        #data_dict["ref_size_residual_label_list"] = np.array(ref_size_residual_label_list).astype(np.float32)
+        # data_dict["ref_box_corner_label_list"] = np.array(ref_box_corner_label_list).astype(np.float64)
         data_dict["object_id_list"] = np.array(object_id_list).astype(np.int64)
         data_dict["ann_id_list"] = np.array(ann_id_list).astype(np.int64)
         data_dict["object_cat_list"] = np.array(object_cat_list).astype(np.int64)
@@ -910,7 +910,7 @@ class ScannetReferenceTestDataset():
         # load data
         self.scene_data = self._load_data()
         self.glove = pickle.load(open(GLOVE_PICKLE, "rb"))
-        self.vocabulary = json.load(open(SCANREFER_VOCAB))
+        self.vocabulary = json.load(open(VOCAB))
         self.multiview_data = {}
        
     def __len__(self):
