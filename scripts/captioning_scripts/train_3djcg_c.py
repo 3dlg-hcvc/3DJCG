@@ -26,7 +26,6 @@ from models.capnet.capnet import CapNet
 from scripts.utils.AdamW import AdamW
 from scripts.utils.script_utils import set_params_lr_dict
 
-from crash_on_ipy import *
 
 # SCANREFER_DUMMY = json.load(open(os.path.join(CONF.PATH.DATA, "ScanRefer_dummy.json")))
 
@@ -39,7 +38,6 @@ SCAN2CAD_ROTATION = json.load(open(os.path.join(CONF.PATH.SCAN2CAD, "scannet_ins
 # constants
 DC = ScannetDatasetConfig()
 
-import crash_on_ipy
 
 def get_dataloader(args, scanrefer, scanrefer_new, all_scene_list, split, config, augment, shuffle=True,
                    scan2cad_rotation=None):

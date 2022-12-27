@@ -5,7 +5,6 @@
 import copy
 from collections import defaultdict
 import numpy as np
-import pdb
 import math
 
 def precook(s, n=4, out=False):

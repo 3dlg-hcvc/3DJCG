@@ -23,7 +23,6 @@ from lib.loss_helper.loss_grounding import get_loss
 from lib.visual_grounding.eval_helper import get_eval
 from models.refnet.refnet import RefNet
 from data.scannet.model_util_scannet import ScannetDatasetConfig
-import crash_on_ipy
 
 print('Import Done', flush=True)
 SCANREFER_TRAIN = json.load(open(os.path.join(CONF.PATH.DATA, "ScanRefer_filtered_train.json")))

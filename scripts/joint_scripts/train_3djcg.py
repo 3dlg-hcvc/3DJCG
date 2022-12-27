@@ -39,7 +39,6 @@ SCAN2CAD_ROTATION = None
 # constants
 DC = ScannetDatasetConfig()
 
-import crash_on_ipy
 
 def get_dataloader(args, scanrefer, scanrefer_new, all_scene_list, split, config, augment, shuffle=True,
                    scan2cad_rotation=None):

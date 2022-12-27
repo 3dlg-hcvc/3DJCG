@@ -22,7 +22,6 @@ from lib.configs.config_grounding import CONF
 from models.refnet.refnet import RefNet
 from scripts.utils.AdamW import AdamW
 from scripts.utils.script_utils import set_params_lr_dict
-import crash_on_ipy
 
 
 SCANREFER_TRAIN = json.load(open(os.path.join(CONF.PATH.DATA, "ScanRefer_filtered_train.json")))
