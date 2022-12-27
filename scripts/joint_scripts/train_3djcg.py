@@ -34,8 +34,8 @@ from crash_on_ipy import *
 # NOTE some scenes are missing in this annotation!!!
 SCANREFER_TRAIN = json.load(open(os.path.join(CONF.PATH.DATA, "ScanRefer_filtered_train.json")))
 SCANREFER_VAL = json.load(open(os.path.join(CONF.PATH.DATA, "ScanRefer_filtered_val.json")))
-# SCAN2CAD_ROTATION = json.load(open(os.path.join(CONF.PATH.SCAN2CAD, "scannet_instance_rotations.json")))
-SCAN2CAD_ROTATION = None
+SCAN2CAD_ROTATION = json.load(open(os.path.join(CONF.PATH.SCAN2CAD, "scannet_instance_rotations.json")))
+# SCAN2CAD_ROTATION = None
 # constants
 DC = ScannetDatasetConfig()
 

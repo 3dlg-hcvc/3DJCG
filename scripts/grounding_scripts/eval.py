@@ -38,7 +38,7 @@ def get_dataloader(args, scanrefer, scanrefer_new, all_scene_list, split, config
         num_points=args.num_points, 
         use_color=args.use_color, 
         use_height=(not args.no_height),
-        use_normal=args.use_normal, 
+        use_normal=args.use_normal,
         use_multiview=args.use_multiview,
         lang_num_max=args.lang_num_max
     )
