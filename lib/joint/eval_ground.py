@@ -4,15 +4,14 @@
 # LICENSE file in the root directory of this source tree.
 
 import torch
-import torch.nn as nn
 import numpy as np
-import sys
-import os
+
 
 # sys.path.append(os.path.join(os.getcwd(), "lib"))  # HACK add the lib folder
-from utils.nn_distance import nn_distance, huber_loss
 from lib.ap_helper.ap_helper_fcos import parse_predictions
-from utils.box_util import get_3d_box, get_3d_box_batch, box3d_iou
+from utils.box_util import get_3d_box, box3d_iou
+
+SCANREFER_PLUS_PLUS = True
 
 
 def eval_ref_one_sample(pred_bbox, gt_bbox):
@@ -95,10 +94,10 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
     # store
     data_dict["ref_acc"] = ref_acc.cpu().numpy().tolist()
 
-    if mem_hash is not None:
+    if SCANREFER_PLUS_PLUS:
         # scanrefer++ support, use threshold to filter predictions instead of argmax
-        #pred_ref_mul_obj_mask = (data_dict["cluster_ref"] * pred_masks) > 5
-        pred_ref_mul_obj_mask = torch.nn.functional.softmax(data_dict["cluster_ref"], dim=1) > 0.1
+        pred_ref_mul_obj_mask = torch.logical_and((torch.sigmoid(data_dict["cluster_ref"]) >= 0.35), pred_masks.bool())
+        # pred_ref_mul_obj_mask = torch.nn.functional.softmax(data_dict["cluster_ref"], dim=1) > 0.1
         # end
 
     # compute localization metricens
@@ -218,7 +217,7 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
                 others.append(flag)
 
                 # scanrefer++ support
-                if mem_hash is not None:
+                if SCANREFER_PLUS_PLUS:
                     multi_pred_bboxes = []
                     multi_pred_ref_idxs = pred_ref_mul_obj_mask[i].nonzero()
                     for idx in multi_pred_ref_idxs:

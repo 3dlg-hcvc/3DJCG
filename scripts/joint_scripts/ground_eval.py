@@ -3,14 +3,11 @@ import sys
 import json
 import pickle
 import argparse
-import importlib
 import torch
-import torch.optim as optim
-import torch.nn as nn
+
 import numpy as np
 
 from torch.utils.data import DataLoader
-from datetime import datetime
 from tqdm import tqdm
 from copy import deepcopy
 
@@ -22,6 +19,9 @@ from lib.loss_helper.loss_joint import get_joint_loss
 from lib.joint.eval_ground import get_eval
 from models.jointnet.jointnet import JointNet
 from data.scannet.model_util_scannet import ScannetDatasetConfig
+
+
+SCANREFER_PLUS_PLUS = True
 
 print('Import Done', flush=True)
 SCANREFER_TRAIN = json.load(open(os.path.join(CONF.PATH.DATA, "ScanRefer_filtered_train.json")))
@@ -189,10 +189,11 @@ def eval_ref(args):
             lang_acc = []
             predictions = {}
             for data in tqdm(dataloader):
-                # scanrefer++ support
-                for scene_id in data["scene_id"]:
-                    if scene_id not in final_output:
-                        final_output[scene_id] = []
+                if SCANREFER_PLUS_PLUS:
+                    # scanrefer++ support
+                    for scene_id in data["scene_id"]:
+                        if scene_id not in final_output:
+                            final_output[scene_id] = []
 
                 for key in data:
                     if key != "scene_id":
@@ -261,12 +262,13 @@ def eval_ref(args):
                 pickle.dump(predictions, f)
 
             # scanrefer+= support
-            for key, value in final_output.items():
-                for query in value:
-                    query["aabbs"] = [item.tolist() for item in query["aabbs"]]
-                os.makedirs("scanrefer++_test", exist_ok=True)
-                with open(f"scanrefer++_test/{key}.json", "w") as f:
-                    json.dump(value, f)
+            if SCANREFER_PLUS_PLUS:
+                for key, value in final_output.items():
+                    for query in value:
+                        query["aabbs"] = [item.tolist() for item in query["aabbs"]]
+                    os.makedirs("scanrefer++_test", exist_ok=True)
+                    with open(f"scanrefer++_test/{key}.json", "w") as f:
+                        json.dump(value, f)
             # end
 
             # save to global
