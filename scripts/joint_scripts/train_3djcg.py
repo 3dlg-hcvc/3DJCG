@@ -59,7 +59,7 @@ def get_dataloader(args, scanrefer, scanrefer_new, all_scene_list, split, config
         scan2cad_rotation=scan2cad_rotation
     )
     # dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
-    dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=4)
+    dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=4, pin_memory=True)
 
     return dataset, dataloader
 
