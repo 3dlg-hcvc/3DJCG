@@ -173,8 +173,8 @@ def eval_ref(args):
         for seed in seeds:
             # reproducibility
             torch.manual_seed(seed)
-            torch.backends.cudnn.deterministic = True
-            torch.backends.cudnn.benchmark = False
+            # torch.backends.cudnn.deterministic = True
+            # torch.backends.cudnn.benchmark = False
             np.random.seed(seed)
 
             # scanrefer++ support
@@ -527,8 +527,8 @@ if __name__ == "__main__":
 
     assert args.lang_num_max == 1, 'lang max num == 1; avoid bugs'
     # setting
-    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
-    os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
+    # os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
+    # os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
     # evaluate
     if args.reference: eval_ref(args)
