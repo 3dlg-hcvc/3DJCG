@@ -812,15 +812,16 @@ class Solver():
                 ground_metrics = ["iou_rate_0.25", "iou_rate_0.5"]
                 ground_cur_best = np.sum([np.mean(self.log[phase][m]) for m in ground_metrics])
                 cur_best = caption_cur_best + ground_cur_best * 2
+                if SCANREFER_PLUS_PLUS:
+                    cur_criterion = "scanrefer++_overall_50"
+                    ground_cur_best = self.log[phase]["scanrefer++_overall_50"]
+                    cur_best = self.log[phase]["scanrefer++_overall_50"]
             else:
                 #cur_best = np.mean(self.log[phase][cur_criterion])
                 caption_cur_best = 0.
                 ground_cur_best = 0.
                 cur_best = 0.
-            if SCANREFER_PLUS_PLUS:
-                cur_criterion = "scanrefer++_overall_50"
-                ground_cur_best = self.log[phase]["scanrefer++_overall_50"]
-                cur_best = self.log[phase]["scanrefer++_overall_50"]
+
 
 
             if phase == "val" and cur_best > self.best[cur_criterion]:
