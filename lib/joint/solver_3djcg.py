@@ -4,7 +4,8 @@ Author: Dave Zhenyu Chen (zhenyu.chen@tum.de)
 '''
 
 import os
-import sys
+import json
+from lib.scanrefer_plus_eval_helper import *
 import time
 import torch
 import numpy as np
@@ -18,7 +19,7 @@ from lib.joint.eval_caption import eval_cap
 from lib.joint.eval_ground import get_eval as eval_ground
 from utils.eta import decode_eta
 from lib.pointnet2.pytorch_utils import BNMomentumScheduler
-
+SCANREFER_PLUS_PLUS = True
 
 ITER_REPORT_TEMPLATE = """
 -------------------------------iter: [{epoch_id}: {iter_id}/{total_iter}]-------------------------------
@@ -177,7 +178,9 @@ class Solver():
             "best_ground_iou_rate_0.25": -float("inf"),
             "best_ground_iou_rate_0.5": -float("inf"),
             "max_iou_rate_0.25": -float("inf"),
-            "max_iou_rate_0.5": -float("inf")
+            "max_iou_rate_0.5": -float("inf"),
+            "scanrefer++_overall_25": -float("inf"),
+            "scanrefer++_overall_50": -float("inf"),
         } if checkpoint_best == None else checkpoint_best
 
         # init log
@@ -477,13 +480,13 @@ class Solver():
         #self._running_log["max_iou_rate_0.5"] = np.mean(data_dict["max_iou_rate_0.5"])
 
 
-    def _ground_eval(self, data_dict, phase, is_eval):
+    def _ground_eval(self, data_dict, phase, is_eval, mem_hash=None, final_output=None):
         if phase == "train" and is_eval == False:
             data_dict = eval_ground(
                 data_dict=data_dict,
                 config=self.config,
                 reference=self.reference,
-                use_lang_classifier=self.use_lang_classifier
+                use_lang_classifier=self.use_lang_classifier,
             )
             # dump
             self._running_log["lang_acc"] = data_dict["lang_acc"].item()
@@ -495,12 +498,15 @@ class Solver():
             self._running_log["iou_rate_0.5"] = np.mean(data_dict["ref_iou_rate_0.5"])
             self._running_log["max_iou_rate_0.25"] = np.mean(data_dict["max_iou_rate_0.25"])
             self._running_log["max_iou_rate_0.5"] = np.mean(data_dict["max_iou_rate_0.5"])
+
         elif phase == "val" and is_eval == True:
             data_dict = eval_ground(
                 data_dict=data_dict,
                 config=self.config,
                 reference=self.reference,
-                use_lang_classifier=self.use_lang_classifier
+                use_lang_classifier=self.use_lang_classifier,
+                mem_hash=mem_hash,
+                final_output=final_output
             )
             # dump
             self._running_log["lang_acc"] = data_dict["lang_acc"].item()
@@ -595,6 +601,7 @@ class Solver():
         if not is_eval:
         #if True:
         #if (not is_eval) or phase == "val":
+
             for data_dict in dataloader:
                 # move to cuda
                 for key in data_dict:
@@ -626,7 +633,9 @@ class Solver():
                     "iou_rate_0.25": 0,
                     "iou_rate_0.5": 0,
                     "max_iou_rate_0.25": 0,
-                    "max_iou_rate_0.5": 0
+                    "max_iou_rate_0.5": 0,
+                    "scanrefer++_overall_25": 0,
+                    "scanrefer++_overall_50": 0
                 }
 
                 # load
@@ -713,17 +722,27 @@ class Solver():
                         self._dump_log("train")
                     #if self._global_iter_id != 0: self._dump_log("train")
                     self._global_iter_id += 1
+
+
         else:
         #if is_eval:
             self._eval(phase, epoch_id)
             if phase == "val":
+                if SCANREFER_PLUS_PLUS:
+                    final_output = {}
+                    mem_hash = {}
+
                 for data_dict in dataloader:
                     # move to cuda
                     for key in data_dict:
                         # data_dict[key] = data_dict[key].cuda()
                         if key != "scene_id":
                             data_dict[key] = data_dict[key].to(self.device)
-
+                    # scanrefer++ support
+                    if SCANREFER_PLUS_PLUS:
+                        for scene_id in data_dict["scene_id"]:
+                            if scene_id not in final_output:
+                                final_output[scene_id] = []
                     # initialize the running loss
                     self._running_log = {
                         # loss
@@ -750,7 +769,7 @@ class Solver():
                     self._compute_loss(data_dict)
 
                     # eval
-                    self._ground_eval(data_dict, phase, is_eval)
+                    self._ground_eval(data_dict, phase, is_eval, mem_hash=mem_hash, final_output=final_output)
 
                     if phase == "val":
                         # record log
@@ -771,6 +790,20 @@ class Solver():
                         self.log[phase]["max_iou_rate_0.25"].append(self._running_log["max_iou_rate_0.25"])
                         self.log[phase]["max_iou_rate_0.5"].append(self._running_log["max_iou_rate_0.5"])
 
+                # scanrefer+= support
+                if SCANREFER_PLUS_PLUS and phase == "val":
+                    for key, value in final_output.items():
+                        for query in value:
+                            query["aabbs"] = [item.tolist() for item in query["aabbs"]]
+                        os.makedirs("scanrefer++_test", exist_ok=True)
+                        with open(f"scanrefer++_test/{key}.json", "w") as f:
+                            json.dump(value, f)
+
+                    all_preds, all_gts = load_gt_and_pred_jsons_from_disk("scanrefer++_test", "3dvg_gt")
+                    iou_25_results, iou_50_results = evaluate_all_scenes(all_preds, all_gts)
+                    self.log[phase]["scanrefer++_overall_25"] = iou_25_results["overall"]
+                    self.log[phase]["scanrefer++_overall_50"] = iou_50_results["overall"]
+
             cur_criterion = self.criterion
             if phase == "val" and cur_criterion == "sum":
                 #metrics = ["bleu-1", "bleu-2", "bleu-3", "bleu-4", "cider", "rouge", "meteor"]
@@ -784,7 +817,12 @@ class Solver():
                 caption_cur_best = 0.
                 ground_cur_best = 0.
                 cur_best = 0.
-            
+            if SCANREFER_PLUS_PLUS:
+                cur_criterion = "scanrefer++_overall_50"
+                ground_cur_best = self.log[phase]["scanrefer++_overall_50"]
+                cur_best = self.log[phase]["scanrefer++_overall_50"]
+
+
             if phase == "val" and cur_best > self.best[cur_criterion]:
                 self._log("best {} achieved: {}".format(cur_criterion, cur_best))
 
@@ -803,6 +841,8 @@ class Solver():
                 self.best["iou_rate_0.25"] = np.mean(self.log[phase]["iou_rate_0.25"])
                 self.best["iou_rate_0.5"] = np.mean(self.log[phase]["iou_rate_0.5"])
                 self.best["sum"] = cur_best
+                self.best["scanrefer++_overall_25"] = self.log[phase]["scanrefer++_overall_25"]
+                self.best["scanrefer++_overall_50"] = self.log[phase]["scanrefer++_overall_50"]
 
                 # save model
                 self._log("saving best models...\n")
@@ -831,6 +871,8 @@ class Solver():
                 self.best["best_ground_iou_rate_0.25"] = np.mean(self.log[phase]["iou_rate_0.25"])
                 self.best["best_ground_iou_rate_0.5"] = np.mean(self.log[phase]["iou_rate_0.5"])
                 self.best["ground_sum"] = ground_cur_best
+                self.best["scanrefer++_overall_25"] = self.log[phase]["scanrefer++_overall_25"]
+                self.best["scanrefer++_overall_50"] = self.log[phase]["scanrefer++_overall_50"]
 
                 # save model
                 self._log("saving best ground models...\n")

@@ -96,7 +96,7 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
 
     if SCANREFER_PLUS_PLUS:
         # scanrefer++ support, use threshold to filter predictions instead of argmax
-        pred_ref_mul_obj_mask = torch.logical_and((torch.sigmoid(data_dict["cluster_ref"]) >= 0.35), pred_masks.bool())
+        pred_ref_mul_obj_mask = torch.logical_and((torch.sigmoid(data_dict["cluster_ref"]) >= 0.4), pred_masks.bool().repeat(1, len_nun_max).reshape(batch_size*len_nun_max, -1))
         # pred_ref_mul_obj_mask = torch.nn.functional.softmax(data_dict["cluster_ref"], dim=1) > 0.1
         # end
 
@@ -183,6 +183,9 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
     gt_bboxes = []
     #print("pred_ref", pred_ref.shape, gt_ref.shape)
     pred_ref = pred_ref.reshape(batch_size, len_nun_max)
+
+    pred_ref_mul_obj_mask = pred_ref_mul_obj_mask.reshape(batch_size, len_nun_max, -1)
+
     for i in range(batch_size):
         # compute the iou
         for j in range(len_nun_max):
@@ -217,9 +220,9 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
                 others.append(flag)
 
                 # scanrefer++ support
-                if SCANREFER_PLUS_PLUS:
+                if SCANREFER_PLUS_PLUS and mem_hash is not None:
                     multi_pred_bboxes = []
-                    multi_pred_ref_idxs = pred_ref_mul_obj_mask[i].nonzero()
+                    multi_pred_ref_idxs = pred_ref_mul_obj_mask[i][j].nonzero()
                     for idx in multi_pred_ref_idxs:
                         pred_center_ids_multi = pred_center[i][idx]
                         pred_heading_ids_multi = pred_heading[i][idx]
@@ -227,8 +230,8 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
                         pred_bbox_multi = get_3d_box(pred_box_size_ids_multi, pred_heading_ids_multi, pred_center_ids_multi)
                         multi_pred_bboxes.append(pred_bbox_multi)
                     output_info = {
-                        "object_id": data_dict["object_id"].flatten()[i].item(),
-                        "ann_id": data_dict["ann_id"].flatten()[i].item(),
+                        "object_id": data_dict["object_id_list"][i][j].item(),
+                        "ann_id": data_dict["ann_id_list"][i][j].item(),
                         "aabbs": multi_pred_bboxes
                     }
                     scene_id = data_dict["scene_id"][i]
