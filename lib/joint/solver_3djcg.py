@@ -252,6 +252,7 @@ class Solver():
              * (self._total_iter["train"] / self.val_step)
         
         for epoch_id in range(epoch):
+            torch.cuda.empty_cache()
             try:
                 self._log("epoch {} starting...".format(epoch_id + 1))
 
@@ -710,6 +711,7 @@ class Solver():
                         self._dump_log("train", True)
                         
                         # val
+
                         print("evaluating on val...")
                         self._feed(self.dataloader["eval"]["val"], "val", epoch_id, is_eval=True)
                         self._dump_log("val", True)
