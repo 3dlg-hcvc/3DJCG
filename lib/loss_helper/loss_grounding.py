@@ -144,10 +144,11 @@ def compute_reference_loss(data_dict, config, no_reference=False):
                             labels_new[j, filtered_ious_indices] = 1
                         else:
                             iou_matrix[k] = ious * -1
-                    row_idx, col_idx = linear_sum_assignment(iou_matrix)
-                    for index in range(len(row_idx)):
-                        if (iou_matrix[row_idx[index], col_idx[index]] * -1) >= 0.25:
-                            labels_new[j, col_idx[index]] = 1
+                    if not SCANREFER_ENHANCE_VANILLE:
+                        row_idx, col_idx = linear_sum_assignment(iou_matrix)
+                        for index in range(len(row_idx)):
+                            if (iou_matrix[row_idx[index], col_idx[index]] * -1) >= 0.25:
+                                labels_new[j, col_idx[index]] = 1
 
 
         cluster_labels = torch.FloatTensor(labels_new).cuda()  # B proposals
