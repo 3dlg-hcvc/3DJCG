@@ -246,8 +246,8 @@ if __name__ == "__main__":
 
     assert args.lang_num_max == 1, 'Test: Lang Num Max == 1'
     # setting
-    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
-    os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
+    #os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
+    #os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
     # reproducibility
     torch.manual_seed(args.seed)

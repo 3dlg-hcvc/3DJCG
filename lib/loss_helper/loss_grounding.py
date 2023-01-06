@@ -6,14 +6,12 @@
 import torch
 import torch.nn as nn
 import numpy as np
-import sys
-import os
 
+from scipy.optimize import linear_sum_assignment
 # sys.path.append(os.path.join(os.getcwd(), "lib")) # HACK add the lib folder
-from utils.nn_distance import nn_distance, huber_loss
 from .loss import SoftmaxRankingLoss
 from utils.box_util import get_3d_box, get_3d_box_batch, box3d_iou, box3d_iou_batch
-from utils.box_util import rotz_batch_pytorch
+
 from .loss_detection import compute_vote_loss, compute_objectness_loss, compute_box_loss, compute_box_and_sem_cls_loss
 
 FAR_THRESHOLD = 0.3
@@ -135,7 +133,7 @@ def compute_reference_loss(data_dict, config, no_reference=False):
                                                           gt_size_class_labels, gt_bboxes_residuals)
                     gt_bbox_batch_new = get_3d_box_batch(gt_obb_batch_new[:, 3:6], gt_obb_batch_new[:, 6], gt_obb_batch_new[:, 0:3])
                     iou_matrix = np.zeros(shape=(gt_bbox_batch_new.shape[0], gt_bbox_batch_new.shape[0]))
-                    for gt_bbox in gt_bbox_batch_new:
+                    for k, gt_bbox in enumerate(gt_bbox_batch_new):
                         ious = box3d_iou_batch(pred_bbox_batch, np.tile(gt_bbox, (num_proposals, 1, 1)))
                         if data_dict["istrain"][0] == 1 and not no_reference and data_dict["random"] < 0.5:
                             ious = ious * objectness_masks[i]
@@ -144,6 +142,13 @@ def compute_reference_loss(data_dict, config, no_reference=False):
                             if filtered_ious_indices[0].shape[0] == 0:
                                 continue
                             labels_new[j, filtered_ious_indices] = 1
+                        else:
+                            iou_matrix[k] = ious * -1
+                    row_idx, col_idx = linear_sum_assignment(iou_matrix)
+                    for index in range(len(row_idx)):
+                        if (iou_matrix[row_idx[index], col_idx[index]] * -1) >= 0.25:
+                            labels_new[j, col_idx[index]] = 1
+
 
         cluster_labels = torch.FloatTensor(labels_new).cuda()  # B proposals
         gt_labels[i] = labels_new

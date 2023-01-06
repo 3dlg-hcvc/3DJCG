@@ -296,8 +296,8 @@ if __name__ == "__main__":
 
 
     # setting
-    os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(args.gpu)
-    os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
+    #os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(args.gpu)
+    #os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
     # reproducibility
     torch.manual_seed(args.seed)
