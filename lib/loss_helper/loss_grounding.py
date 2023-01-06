@@ -132,7 +132,7 @@ def compute_reference_loss(data_dict, config, no_reference=False):
                                                           gt_heading_residual_labels,
                                                           gt_size_class_labels, gt_bboxes_residuals)
                     gt_bbox_batch_new = get_3d_box_batch(gt_obb_batch_new[:, 3:6], gt_obb_batch_new[:, 6], gt_obb_batch_new[:, 0:3])
-                    iou_matrix = np.zeros(shape=(gt_bbox_batch_new.shape[0], gt_bbox_batch_new.shape[0]))
+                    iou_matrix = np.zeros(shape=(gt_bbox_batch_new.shape[0], ious.shape[0]))
                     for k, gt_bbox in enumerate(gt_bbox_batch_new):
                         ious = box3d_iou_batch(pred_bbox_batch, np.tile(gt_bbox, (num_proposals, 1, 1)))
                         if data_dict["istrain"][0] == 1 and not no_reference and data_dict["random"] < 0.5:
