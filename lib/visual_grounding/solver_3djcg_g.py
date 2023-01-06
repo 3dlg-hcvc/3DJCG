@@ -85,6 +85,7 @@ BEST_REPORT_TEMPLATE = """
 [sco.] obj_acc: {obj_acc}
 [sco.] pos_ratio: {pos_ratio}, neg_ratio: {neg_ratio}
 [sco.] iou_rate_0.25: {iou_rate_25}, iou_rate_0.5: {iou_rate_5}
+[sco.] scanrefer_plus_overall_25: {scanrefer_plus_overall_25}, scanrefer_plus_overall_50: {scanrefer_plus_overall_50},
 """
 
 class Solver():
@@ -642,6 +643,8 @@ class Solver():
             neg_ratio=round(self.best["neg_ratio"], 5),
             iou_rate_25=round(self.best["iou_rate_0.25"], 5),
             iou_rate_5=round(self.best["iou_rate_0.5"], 5),
+            scanrefer_plus_overall_25=round(self.best["scanrefer++_overall_25"], 5),
+            scanrefer_plus_overall_50=round(self.best["scanrefer++_overall_50"], 5),
         )
         self._log(best_report)
         with open(os.path.join(CONF.PATH.OUTPUT, self.stamp, "best.txt"), "w") as f:
