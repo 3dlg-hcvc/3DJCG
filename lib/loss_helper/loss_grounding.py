@@ -20,7 +20,7 @@ GT_VOTE_FACTOR = 3  # number of GT votes per point
 OBJECTNESS_CLS_WEIGHTS = [0.2, 0.8]  # put larger weights on positive objectness
 
 SCANREFER_ENHANCE = True
-SCANREFER_ENHANCE_VANILLE = True
+SCANREFER_ENHANCE_VANILLE = False
 
 def compute_reference_loss(data_dict, config, no_reference=False):
     """ Compute cluster reference loss
