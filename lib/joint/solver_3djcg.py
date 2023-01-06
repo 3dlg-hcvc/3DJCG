@@ -707,12 +707,14 @@ class Solver():
                     if self._global_iter_id % new_val_step == 0 and self._global_iter_id != 0:
                         # eval on train
                         print("evaluating on train...")
+                        torch.cuda.empty_cache()
                         self._feed(self.dataloader["eval"]["train"], "train", epoch_id, is_eval=True)
                         self._dump_log("train", True)
                         
                         # val
 
                         print("evaluating on val...")
+                        torch.cuda.empty_cache()
                         self._feed(self.dataloader["eval"]["val"], "val", epoch_id, is_eval=True)
                         self._dump_log("val", True)
 
