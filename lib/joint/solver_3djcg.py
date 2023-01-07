@@ -90,7 +90,7 @@ EPOCH_REPORT_TEMPLATE = """
 [val]   val_pos_ratio: {val_pos_ratio}, val_neg_ratio: {val_neg_ratio}
 [val]   val_iou_rate_0.25: {val_iou_rate_25}, val_iou_rate_0.5: {val_iou_rate_5}
 [val]   val_max_iou_rate_0.25: {val_max_iou_rate_25}, val_max_iou_rate_0.5: {val_max_iou_rate_5}
-[val]   scanrefer_plus_overall_25: {scanrefer++_overall_25}, scanrefer_plus_overall_50: {scanrefer++_overall_50},
+[val]   scanrefer_plus_overall_25: {scanrefer_plus_overall_25}, scanrefer_plus_overall_50: {scanrefer_plus_overall_50},
 """
 
 BEST_REPORT_TEMPLATE = """
