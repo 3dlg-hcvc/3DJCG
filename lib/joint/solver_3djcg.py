@@ -708,14 +708,12 @@ class Solver():
                     if self._global_iter_id % new_val_step == 0 and self._global_iter_id != 0:
                         # eval on train
                         print("evaluating on train...")
-                        torch.cuda.empty_cache()
                         self._feed(self.dataloader["eval"]["train"], "train", epoch_id, is_eval=True)
                         self._dump_log("train", True)
                         
                         # val
 
                         print("evaluating on val...")
-                        torch.cuda.empty_cache()
                         self._feed(self.dataloader["eval"]["val"], "val", epoch_id, is_eval=True)
                         self._dump_log("val", True)
 
@@ -805,7 +803,6 @@ class Solver():
                             json.dump(value, f)
 
                     all_preds, all_gts = load_gt_and_pred_jsons_from_disk("scanrefer++_test", "3dvg_gt")
-                    print("?????????????????????????????????????????????????????????????????")
                     iou_25_results, iou_50_results = evaluate_all_scenes(all_preds, all_gts)
                     self.log[phase]["scanrefer++_overall_25"] = iou_25_results["overall"]
                     self.log[phase]["scanrefer++_overall_50"] = iou_50_results["overall"]
