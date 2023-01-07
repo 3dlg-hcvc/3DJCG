@@ -96,7 +96,7 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
 
     if SCANREFER_PLUS_PLUS:
         # scanrefer++ support, use threshold to filter predictions instead of argmax
-        pred_ref_mul_obj_mask = torch.logical_and((torch.sigmoid(data_dict["cluster_ref"]) >= 0.2), pred_masks.bool().repeat(1, len_nun_max).reshape(batch_size*len_nun_max, -1)).cpu().numpy()
+        pred_ref_mul_obj_mask = torch.logical_and((torch.sigmoid(data_dict["cluster_ref"]) >= 0.1), pred_masks.bool().repeat(1, len_nun_max).reshape(batch_size*len_nun_max, -1)).cpu().numpy()
         # pred_ref_mul_obj_mask = torch.nn.functional.softmax(data_dict["cluster_ref"], dim=1) > 0.1
         # end
 
