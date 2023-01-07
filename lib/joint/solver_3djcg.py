@@ -731,159 +731,160 @@ class Solver():
 
         else:
         #if is_eval:
-            self._eval(phase, epoch_id)
-            if phase == "val":
-                if SCANREFER_PLUS_PLUS:
-                    final_output = {}
-                    mem_hash = {}
-
-                for data_dict in dataloader:
-                    # move to cuda
-                    for key in data_dict:
-                        # data_dict[key] = data_dict[key].cuda()
-                        if key != "scene_id":
-                            data_dict[key] = data_dict[key].to(self.device)
-                    # scanrefer++ support
+            with torch.no_grad():
+                self._eval(phase, epoch_id)
+                if phase == "val":
                     if SCANREFER_PLUS_PLUS:
-                        for scene_id in data_dict["scene_id"]:
-                            if scene_id not in final_output:
-                                final_output[scene_id] = []
-                    # initialize the running loss
-                    self._running_log = {
-                        # loss
-                        "loss": 0,
-                        "ref_loss": 0,
-                        "lang_loss": 0,
-                        "objectness_loss": 0,
-                        "vote_loss": 0,
-                        "box_loss": 0,
-                        # acc
-                        "lang_acc": 0,
-                        "ref_acc": 0,
-                        "obj_acc": 0,
-                        "pos_ratio": 0,
-                        "neg_ratio": 0,
-                        "iou_rate_0.25": 0,
-                        "iou_rate_0.5": 0,
-                        "max_iou_rate_0.25": 0,
-                        "max_iou_rate_0.5": 0
-                    }
+                        final_output = {}
+                        mem_hash = {}
 
-                    data_dict["epoch"] = epoch_id
-                    data_dict = self._forward(data_dict)
-                    self._compute_loss(data_dict)
+                    for data_dict in dataloader:
+                        # move to cuda
+                        for key in data_dict:
+                            # data_dict[key] = data_dict[key].cuda()
+                            if key != "scene_id":
+                                data_dict[key] = data_dict[key].to(self.device)
+                        # scanrefer++ support
+                        if SCANREFER_PLUS_PLUS:
+                            for scene_id in data_dict["scene_id"]:
+                                if scene_id not in final_output:
+                                    final_output[scene_id] = []
+                        # initialize the running loss
+                        self._running_log = {
+                            # loss
+                            "loss": 0,
+                            "ref_loss": 0,
+                            "lang_loss": 0,
+                            "objectness_loss": 0,
+                            "vote_loss": 0,
+                            "box_loss": 0,
+                            # acc
+                            "lang_acc": 0,
+                            "ref_acc": 0,
+                            "obj_acc": 0,
+                            "pos_ratio": 0,
+                            "neg_ratio": 0,
+                            "iou_rate_0.25": 0,
+                            "iou_rate_0.5": 0,
+                            "max_iou_rate_0.25": 0,
+                            "max_iou_rate_0.5": 0
+                        }
 
-                    # eval
-                    self._ground_eval(data_dict, phase, is_eval, mem_hash=mem_hash, final_output=final_output)
+                        data_dict["epoch"] = epoch_id
+                        data_dict = self._forward(data_dict)
+                        self._compute_loss(data_dict)
 
-                    if phase == "val":
-                        # record log
-                        self.log[phase]["loss"].append(self._running_log["loss"].item())
-                        self.log[phase]["ref_loss"].append(self._running_log["ref_loss"].item())
-                        self.log[phase]["lang_loss"].append(self._running_log["lang_loss"].item())
-                        self.log[phase]["objectness_loss"].append(self._running_log["objectness_loss"].item())
-                        self.log[phase]["vote_loss"].append(self._running_log["vote_loss"].item())
-                        self.log[phase]["box_loss"].append(self._running_log["box_loss"].item())
+                        # eval
+                        self._ground_eval(data_dict, phase, is_eval, mem_hash=mem_hash, final_output=final_output)
 
-                        self.log[phase]["lang_acc"].append(self._running_log["lang_acc"])
-                        self.log[phase]["ref_acc"].append(self._running_log["ref_acc"])
-                        self.log[phase]["obj_acc"].append(self._running_log["obj_acc"])
-                        self.log[phase]["pos_ratio"].append(self._running_log["pos_ratio"])
-                        self.log[phase]["neg_ratio"].append(self._running_log["neg_ratio"])
-                        self.log[phase]["iou_rate_0.25"].append(self._running_log["iou_rate_0.25"])
-                        self.log[phase]["iou_rate_0.5"].append(self._running_log["iou_rate_0.5"])
-                        self.log[phase]["max_iou_rate_0.25"].append(self._running_log["max_iou_rate_0.25"])
-                        self.log[phase]["max_iou_rate_0.5"].append(self._running_log["max_iou_rate_0.5"])
+                        if phase == "val":
+                            # record log
+                            self.log[phase]["loss"].append(self._running_log["loss"].item())
+                            self.log[phase]["ref_loss"].append(self._running_log["ref_loss"].item())
+                            self.log[phase]["lang_loss"].append(self._running_log["lang_loss"].item())
+                            self.log[phase]["objectness_loss"].append(self._running_log["objectness_loss"].item())
+                            self.log[phase]["vote_loss"].append(self._running_log["vote_loss"].item())
+                            self.log[phase]["box_loss"].append(self._running_log["box_loss"].item())
 
-                # scanrefer+= support
-                if SCANREFER_PLUS_PLUS and phase == "val":
-                    for key, value in final_output.items():
-                        for query in value:
-                            query["aabbs"] = [item.tolist() for item in query["aabbs"]]
-                        os.makedirs("scanrefer++_test", exist_ok=True)
-                        with open(f"scanrefer++_test/{key}.json", "w") as f:
-                            json.dump(value, f)
+                            self.log[phase]["lang_acc"].append(self._running_log["lang_acc"])
+                            self.log[phase]["ref_acc"].append(self._running_log["ref_acc"])
+                            self.log[phase]["obj_acc"].append(self._running_log["obj_acc"])
+                            self.log[phase]["pos_ratio"].append(self._running_log["pos_ratio"])
+                            self.log[phase]["neg_ratio"].append(self._running_log["neg_ratio"])
+                            self.log[phase]["iou_rate_0.25"].append(self._running_log["iou_rate_0.25"])
+                            self.log[phase]["iou_rate_0.5"].append(self._running_log["iou_rate_0.5"])
+                            self.log[phase]["max_iou_rate_0.25"].append(self._running_log["max_iou_rate_0.25"])
+                            self.log[phase]["max_iou_rate_0.5"].append(self._running_log["max_iou_rate_0.5"])
 
-                    all_preds, all_gts = load_gt_and_pred_jsons_from_disk("scanrefer++_test", "3dvg_gt")
-                    iou_25_results, iou_50_results = evaluate_all_scenes(all_preds, all_gts)
-                    self.log[phase]["scanrefer++_overall_25"] = iou_25_results["overall"]
-                    self.log[phase]["scanrefer++_overall_50"] = iou_50_results["overall"]
+                    # scanrefer+= support
+                    if SCANREFER_PLUS_PLUS and phase == "val":
+                        for key, value in final_output.items():
+                            for query in value:
+                                query["aabbs"] = [item.tolist() for item in query["aabbs"]]
+                            os.makedirs("scanrefer++_test", exist_ok=True)
+                            with open(f"scanrefer++_test/{key}.json", "w") as f:
+                                json.dump(value, f)
 
-            cur_criterion = self.criterion
-            if phase == "val" and cur_criterion == "sum":
-                #metrics = ["bleu-1", "bleu-2", "bleu-3", "bleu-4", "cider", "rouge", "meteor"]
-                metrics = ["bleu-4", "cider", "rouge", "meteor"]
-                caption_cur_best = np.sum([np.mean(self.log[phase][m]) for m in metrics])
-                ground_metrics = ["iou_rate_0.25", "iou_rate_0.5"]
-                ground_cur_best = np.sum([np.mean(self.log[phase][m]) for m in ground_metrics])
-                cur_best = caption_cur_best + ground_cur_best * 2
-                if SCANREFER_PLUS_PLUS:
-                    cur_criterion = "scanrefer++_overall_50"
-                    ground_cur_best = self.log[phase]["scanrefer++_overall_50"]
-                    cur_best = self.log[phase]["scanrefer++_overall_50"]
-            else:
-                #cur_best = np.mean(self.log[phase][cur_criterion])
-                caption_cur_best = 0.
-                ground_cur_best = 0.
-                cur_best = 0.
+                        all_preds, all_gts = load_gt_and_pred_jsons_from_disk("scanrefer++_test", "3dvg_gt")
+                        iou_25_results, iou_50_results = evaluate_all_scenes(all_preds, all_gts)
+                        self.log[phase]["scanrefer++_overall_25"] = iou_25_results["overall"]
+                        self.log[phase]["scanrefer++_overall_50"] = iou_50_results["overall"]
+
+                cur_criterion = self.criterion
+                if phase == "val" and cur_criterion == "sum":
+                    #metrics = ["bleu-1", "bleu-2", "bleu-3", "bleu-4", "cider", "rouge", "meteor"]
+                    metrics = ["bleu-4", "cider", "rouge", "meteor"]
+                    caption_cur_best = np.sum([np.mean(self.log[phase][m]) for m in metrics])
+                    ground_metrics = ["iou_rate_0.25", "iou_rate_0.5"]
+                    ground_cur_best = np.sum([np.mean(self.log[phase][m]) for m in ground_metrics])
+                    cur_best = caption_cur_best + ground_cur_best * 2
+                    if SCANREFER_PLUS_PLUS:
+                        cur_criterion = "scanrefer++_overall_50"
+                        ground_cur_best = self.log[phase]["scanrefer++_overall_50"]
+                        cur_best = self.log[phase]["scanrefer++_overall_50"]
+                else:
+                    #cur_best = np.mean(self.log[phase][cur_criterion])
+                    caption_cur_best = 0.
+                    ground_cur_best = 0.
+                    cur_best = 0.
 
 
 
-            if phase == "val" and cur_best > self.best[cur_criterion]:
-                self._log("best {} achieved: {}".format(cur_criterion, cur_best))
+                if phase == "val" and cur_best > self.best[cur_criterion]:
+                    self._log("best {} achieved: {}".format(cur_criterion, cur_best))
 
-                self.best["epoch"] = epoch_id + 1
-                self.best["bleu-1"] = self.log[phase]["bleu-1"]
-                self.best["bleu-2"] = self.log[phase]["bleu-2"]
-                self.best["bleu-3"] = self.log[phase]["bleu-3"]
-                self.best["bleu-4"] = self.log[phase]["bleu-4"]
-                self.best["cider"] = self.log[phase]["cider"]
-                self.best["rouge"] = self.log[phase]["rouge"]
-                self.best["meteor"] = self.log[phase]["meteor"]
-                self.best["ref_acc"] = np.mean(self.log[phase]["ref_acc"])
-                self.best["obj_acc"] = np.mean(self.log[phase]["obj_acc"])
-                self.best["pos_ratio"] = np.mean(self.log[phase]["pos_ratio"])
-                self.best["neg_ratio"] = np.mean(self.log[phase]["neg_ratio"])
-                self.best["iou_rate_0.25"] = np.mean(self.log[phase]["iou_rate_0.25"])
-                self.best["iou_rate_0.5"] = np.mean(self.log[phase]["iou_rate_0.5"])
-                self.best["sum"] = cur_best
-                self.best["scanrefer++_overall_25"] = self.log[phase]["scanrefer++_overall_25"]
-                self.best["scanrefer++_overall_50"] = self.log[phase]["scanrefer++_overall_50"]
+                    self.best["epoch"] = epoch_id + 1
+                    self.best["bleu-1"] = self.log[phase]["bleu-1"]
+                    self.best["bleu-2"] = self.log[phase]["bleu-2"]
+                    self.best["bleu-3"] = self.log[phase]["bleu-3"]
+                    self.best["bleu-4"] = self.log[phase]["bleu-4"]
+                    self.best["cider"] = self.log[phase]["cider"]
+                    self.best["rouge"] = self.log[phase]["rouge"]
+                    self.best["meteor"] = self.log[phase]["meteor"]
+                    self.best["ref_acc"] = np.mean(self.log[phase]["ref_acc"])
+                    self.best["obj_acc"] = np.mean(self.log[phase]["obj_acc"])
+                    self.best["pos_ratio"] = np.mean(self.log[phase]["pos_ratio"])
+                    self.best["neg_ratio"] = np.mean(self.log[phase]["neg_ratio"])
+                    self.best["iou_rate_0.25"] = np.mean(self.log[phase]["iou_rate_0.25"])
+                    self.best["iou_rate_0.5"] = np.mean(self.log[phase]["iou_rate_0.5"])
+                    self.best["sum"] = cur_best
+                    self.best["scanrefer++_overall_25"] = self.log[phase]["scanrefer++_overall_25"]
+                    self.best["scanrefer++_overall_50"] = self.log[phase]["scanrefer++_overall_50"]
 
-                # save model
-                self._log("saving best models...\n")
-                model_root = os.path.join(CONF.PATH.OUTPUT, self.stamp)
-                torch.save(self.model.state_dict(), os.path.join(model_root, "model.pth"))
+                    # save model
+                    self._log("saving best models...\n")
+                    model_root = os.path.join(CONF.PATH.OUTPUT, self.stamp)
+                    torch.save(self.model.state_dict(), os.path.join(model_root, "model.pth"))
 
-            if phase == "val" and caption_cur_best > self.best["caption_sum"]:
-                self._log("best caption {} achieved: {}".format(cur_criterion, caption_cur_best))
+                if phase == "val" and caption_cur_best > self.best["caption_sum"]:
+                    self._log("best caption {} achieved: {}".format(cur_criterion, caption_cur_best))
 
-                self.best["best_caption_epoch"] = epoch_id + 1
-                self.best["best_caption_bleu-4"] = self.log[phase]["bleu-4"]
-                self.best["best_caption_cider"] = self.log[phase]["cider"]
-                self.best["best_caption_rouge"] = self.log[phase]["rouge"]
-                self.best["best_caption_meteor"] = self.log[phase]["meteor"]
-                self.best["caption_sum"] = caption_cur_best
+                    self.best["best_caption_epoch"] = epoch_id + 1
+                    self.best["best_caption_bleu-4"] = self.log[phase]["bleu-4"]
+                    self.best["best_caption_cider"] = self.log[phase]["cider"]
+                    self.best["best_caption_rouge"] = self.log[phase]["rouge"]
+                    self.best["best_caption_meteor"] = self.log[phase]["meteor"]
+                    self.best["caption_sum"] = caption_cur_best
 
-                # save model
-                self._log("saving best caption models...\n")
-                model_root = os.path.join(CONF.PATH.OUTPUT, self.stamp)
-                torch.save(self.model.state_dict(), os.path.join(model_root, "caption_model.pth"))
+                    # save model
+                    self._log("saving best caption models...\n")
+                    model_root = os.path.join(CONF.PATH.OUTPUT, self.stamp)
+                    torch.save(self.model.state_dict(), os.path.join(model_root, "caption_model.pth"))
 
-            if phase == "val" and ground_cur_best > self.best["ground_sum"]:
-                self._log("best ground {} achieved: {}".format(cur_criterion, ground_cur_best))
+                if phase == "val" and ground_cur_best > self.best["ground_sum"]:
+                    self._log("best ground {} achieved: {}".format(cur_criterion, ground_cur_best))
 
-                self.best["best_ground_epoch"] = epoch_id + 1
-                self.best["best_ground_iou_rate_0.25"] = np.mean(self.log[phase]["iou_rate_0.25"])
-                self.best["best_ground_iou_rate_0.5"] = np.mean(self.log[phase]["iou_rate_0.5"])
-                self.best["ground_sum"] = ground_cur_best
-                self.best["scanrefer++_overall_25"] = self.log[phase]["scanrefer++_overall_25"]
-                self.best["scanrefer++_overall_50"] = self.log[phase]["scanrefer++_overall_50"]
+                    self.best["best_ground_epoch"] = epoch_id + 1
+                    self.best["best_ground_iou_rate_0.25"] = np.mean(self.log[phase]["iou_rate_0.25"])
+                    self.best["best_ground_iou_rate_0.5"] = np.mean(self.log[phase]["iou_rate_0.5"])
+                    self.best["ground_sum"] = ground_cur_best
+                    self.best["scanrefer++_overall_25"] = self.log[phase]["scanrefer++_overall_25"]
+                    self.best["scanrefer++_overall_50"] = self.log[phase]["scanrefer++_overall_50"]
 
-                # save model
-                self._log("saving best ground models...\n")
-                model_root = os.path.join(CONF.PATH.OUTPUT, self.stamp)
-                torch.save(self.model.state_dict(), os.path.join(model_root, "ground_model.pth"))
+                    # save model
+                    self._log("saving best ground models...\n")
+                    model_root = os.path.join(CONF.PATH.OUTPUT, self.stamp)
+                    torch.save(self.model.state_dict(), os.path.join(model_root, "ground_model.pth"))
 
     def _finish(self, epoch_id):
         # print best
