@@ -4,17 +4,16 @@ Modified from: https://github.com/facebookresearch/votenet/blob/master/models/pr
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import numpy as np
-import os
-import sys
 
-import lib.pointnet2.pointnet2_utils
-from data.scannet.model_util_scannet import ScannetDatasetConfig
+
+
 from lib.pointnet2.pointnet2_modules import PointnetSAModuleVotes
 # from utils.box_util import get_3d_box_batch_of_rois_tensor, rotz_batch_pytorch
 from utils.box_util import get_3d_box_batch, rotz_batch_pytorch
 from models.proposal_module.ROI_heads.roi_heads import StandardROIHeads
+from macro import *
+
 
 class ProposalModule(nn.Module):
     def __init__(self, num_class, num_heading_bin, num_size_cluster, mean_size_arr, num_proposal, sampling, seed_feat_dim=256):
@@ -52,13 +51,17 @@ class ProposalModule(nn.Module):
         """
 
         # Farthest point sampling (FPS) on votes
-        xyz, features, fps_inds = self.vote_aggregation(xyz, features)
+        if not USE_GT:
+            xyz, features, fps_inds = self.vote_aggregation(xyz, features)
 
-        sample_inds = fps_inds
+            sample_inds = fps_inds
 
-        data_dict['aggregated_vote_xyz'] = xyz # (batch_size, num_proposal, 3)
-        data_dict['aggregated_vote_features'] = features.permute(0, 2, 1).contiguous() # (batch_size, num_proposal, 128)
-        data_dict['aggregated_vote_inds'] = sample_inds # (batch_size, num_proposal,) # should be 0,1,2,...,num_proposal
+            data_dict['aggregated_vote_xyz'] = xyz # (batch_size, num_proposal, 3)
+            data_dict['aggregated_vote_features'] = features.permute(0, 2, 1).contiguous() # (batch_size, num_proposal, 128)
+            data_dict['aggregated_vote_inds'] = sample_inds # (batch_size, num_proposal,) # should be 0,1,2,...,num_proposal
+        else:
+            data_dict['aggregated_vote_xyz'] = xyz  # (batch_size, num_proposal, 3)
+            data_dict['aggregated_vote_features'] = features
 
         # --------- PROPOSAL GENERATION ---------
         data_dict = self.proposal(features, data_dict)

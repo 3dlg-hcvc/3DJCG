@@ -11,7 +11,7 @@ import numpy as np
 from lib.ap_helper.ap_helper_fcos import parse_predictions
 from utils.box_util import get_3d_box, box3d_iou
 
-SCANREFER_PLUS_PLUS = True
+from macro import *
 
 
 def eval_ref_one_sample(pred_bbox, gt_bbox):
@@ -59,21 +59,25 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
     """
 
     #batch_size, num_words, _ = data_dict["lang_feat"].shape
+    if not USE_GT:
+        objectness_preds_batch = torch.argmax(data_dict['objectness_scores'], 2).long()
+        objectness_labels_batch = data_dict['objectness_label'].long()
 
-    objectness_preds_batch = torch.argmax(data_dict['objectness_scores'], 2).long()
-    objectness_labels_batch = data_dict['objectness_label'].long()
+        if post_processing:
+            _ = parse_predictions(data_dict, post_processing)
+            nms_masks = torch.LongTensor(data_dict['pred_mask']).cuda()
 
-    if post_processing:
-        _ = parse_predictions(data_dict, post_processing)
-        nms_masks = torch.LongTensor(data_dict['pred_mask']).cuda()
-
-        # construct valid mask
-        pred_masks = (nms_masks * objectness_preds_batch == 1).float()
-        label_masks = (objectness_labels_batch == 1).float()
+            # construct valid mask
+            pred_masks = (nms_masks * objectness_preds_batch == 1).float()
+            label_masks = (objectness_labels_batch == 1).float()
+        else:
+            # construct valid mask
+            pred_masks = (objectness_preds_batch == 1).float()
+            label_masks = (objectness_labels_batch == 1).float()
     else:
-        # construct valid mask
-        pred_masks = (objectness_preds_batch == 1).float()
-        label_masks = (objectness_labels_batch == 1).float()
+        # TODO
+        pred_masks = torch.ones(size=(data_dict["center_label"].shape[0], 256), dtype=torch.float32, device="cuda")
+        label_masks = torch.ones(size=(data_dict["center_label"].shape[0], 256), dtype=torch.float32, device="cuda")
 
     #print("pred_masks", pred_masks.shape, label_masks.shape)
     batch_size, len_nun_max = data_dict["multi_ref_box_label_list"].shape[:2]
@@ -94,9 +98,9 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
     # store
     data_dict["ref_acc"] = ref_acc.cpu().numpy().tolist()
 
-    if SCANREFER_PLUS_PLUS:
+    if SCANREFER_ENHANCE:
         # scanrefer++ support, use threshold to filter predictions instead of argmax
-        pred_ref_mul_obj_mask = torch.logical_and((torch.sigmoid(data_dict["cluster_ref"]) >= 0.1), pred_masks.bool().repeat(1, len_nun_max).reshape(batch_size*len_nun_max, -1)).cpu().numpy()
+        pred_ref_mul_obj_mask = torch.logical_and((torch.sigmoid(data_dict["cluster_ref"]) >= SCANREFER_ENHANCE_EVAL_THRESHOLD), pred_masks.bool().repeat(1, len_nun_max).reshape(batch_size*len_nun_max, -1)).cpu().numpy()
         # pred_ref_mul_obj_mask = torch.nn.functional.softmax(data_dict["cluster_ref"], dim=1) > 0.1
         # end
 
@@ -220,7 +224,7 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
                 others.append(flag)
 
                 # scanrefer++ support
-                if SCANREFER_PLUS_PLUS and mem_hash is not None:
+                if SCANREFER_ENHANCE and mem_hash is not None:
                     multi_pred_bboxes = []
                     multi_pred_ref_idxs = pred_ref_mul_obj_mask[i][j].nonzero()
                     for idx in multi_pred_ref_idxs[0]:
@@ -260,16 +264,17 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
 
     # --------------------------------------------
     # Some other statistics
-    obj_pred_val = torch.argmax(data_dict['objectness_scores'], 2)  # B,K
-    obj_acc = torch.sum(
-        (obj_pred_val == data_dict['objectness_label'].long()).float() * data_dict['objectness_mask']) / (
-                          torch.sum(data_dict['objectness_mask']) + 1e-6)
-    data_dict['obj_acc'] = obj_acc
-    # detection semantic classification
-    sem_cls_label = torch.gather(data_dict['sem_cls_label'], 1,
-                                 data_dict['object_assignment'])  # select (B,K) from (B,K2)
-    sem_cls_pred = data_dict['sem_cls_scores'].argmax(-1)  # (B,K)
-    sem_match = (sem_cls_label == sem_cls_pred).float()
-    data_dict["sem_acc"] = (sem_match * data_dict["pred_mask"]).sum() / data_dict["pred_mask"].sum()
+    if not USE_GT:
+        obj_pred_val = torch.argmax(data_dict['objectness_scores'], 2)  # B,K
+        obj_acc = torch.sum(
+            (obj_pred_val == data_dict['objectness_label'].long()).float() * data_dict['objectness_mask']) / (
+                              torch.sum(data_dict['objectness_mask']) + 1e-6)
+        data_dict['obj_acc'] = obj_acc
+        # detection semantic classification
+        sem_cls_label = torch.gather(data_dict['sem_cls_label'], 1,
+                                     data_dict['object_assignment'])  # select (B,K) from (B,K2)
+        sem_cls_pred = data_dict['sem_cls_scores'].argmax(-1)  # (B,K)
+        sem_match = (sem_cls_label == sem_cls_pred).float()
+        data_dict["sem_acc"] = (sem_match * data_dict["pred_mask"]).sum() / data_dict["pred_mask"].sum()
 
     return data_dict

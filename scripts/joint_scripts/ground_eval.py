@@ -19,14 +19,16 @@ from lib.loss_helper.loss_joint import get_joint_loss
 from lib.joint.eval_ground import get_eval
 from models.jointnet.jointnet import JointNet
 from data.scannet.model_util_scannet import ScannetDatasetConfig
+from torch.utils.data._utils.collate import default_collate
+from lib.pointgroup_ops.functions import pointgroup_ops
 
-
-SCANREFER_PLUS_PLUS = True
+from macro import *
 
 print('Import Done', flush=True)
 SCANREFER_TRAIN = json.load(open(os.path.join(CONF.PATH.DATA, "ScanRefer_filtered_train.json")))
 SCANREFER_VAL = json.load(open(os.path.join(CONF.PATH.DATA, "ScanRefer_filtered_val.json")))
 # SCANREFER_VAL = json.load(open(os.path.join(CONF.PATH.DATA, "ScanRefer_filtered_test.json")))
+
 
 def get_dataloader(args, scanrefer, scanrefer_new, all_scene_list, split, config):
     dataset = ScannetReferenceDataset(
@@ -35,18 +37,84 @@ def get_dataloader(args, scanrefer, scanrefer_new, all_scene_list, split, config
         scanrefer_all_scene=all_scene_list, 
         split=split,
         name=args.dataset,
-        num_points=args.num_points, 
+        num_points=args.num_points if not USE_GT else 50000,
         use_color=args.use_color, 
-        use_height=(not args.no_height),
+        use_height=(not args.no_height) if not USE_GT else False,
         use_normal=args.use_normal, 
         use_multiview=args.use_multiview,
         lang_num_max=args.lang_num_max
     )
     print("evaluate on {} samples".format(len(dataset)))
+    if USE_GT:
+        dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, collate_fn=_collate_fn)
+    else:
+        dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
 
-    dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
 
     return dataset, dataloader
+
+
+def _collate_fn(batch):
+    locs_scaled = []
+    gt_proposals_idx = []
+    gt_proposals_offset = []
+    instances_bboxes_tmp = []
+    me_feats = []
+    batch_offsets = [0]
+    total_num_inst = 0
+    total_points = 0
+    # instance_info = []
+    #instance_offsets = [0]
+    instance_ids = []
+    for i, b in enumerate(batch):
+        locs_scaled.append(
+            torch.cat([
+                torch.LongTensor(b["locs_scaled"].shape[0], 1).fill_(i),
+                torch.from_numpy(b["locs_scaled"]).long()
+            ], 1))
+        batch_offsets.append(batch_offsets[-1] + b["locs_scaled"].shape[0])
+        me_feats.append(torch.cat((torch.from_numpy(b["point_clouds"][:, 3:]), torch.from_numpy(b["point_clouds"][:, 0:3])), 1))
+
+        if "gt_proposals_idx" in b:
+            gt_proposals_idx_i = b["gt_proposals_idx"]
+            gt_proposals_idx_i[:, 0] += total_num_inst
+            gt_proposals_idx_i[:, 1] += total_points
+            gt_proposals_idx.append(torch.from_numpy(b["gt_proposals_idx"]))
+            instances_bboxes_tmp.append(torch.from_numpy(b["instances_bboxes_tmp"]))
+            if gt_proposals_offset != []:
+                gt_proposals_offset_i = b["gt_proposals_offset"]
+                gt_proposals_offset_i += gt_proposals_offset[-1][-1].item()
+                gt_proposals_offset.append(torch.from_numpy(gt_proposals_offset_i[1:]))
+            else:
+                gt_proposals_offset.append(torch.from_numpy(b["gt_proposals_offset"]))
+
+        instance_ids_i = b["instance_ids"]
+        instance_ids_i[np.where(instance_ids_i != 0)] += total_num_inst
+        total_num_inst += b["instances_bboxes_tmp"].shape[0]
+        total_points += len(instance_ids_i)
+        instance_ids.append(torch.from_numpy(instance_ids_i))
+
+        # instance_info.append(torch.from_numpy(b["instance_info"]))
+        # instance_offsets.append(instance_offsets[-1] + b["instances_bboxes_tmp"].shape[0])
+
+        b.pop("instance_ids", None)
+        b.pop("locs_scaled", None)
+        b.pop("gt_proposals_idx", None)
+        b.pop("gt_proposals_offset", None)
+        b.pop("instances_bboxes_tmp", None)
+
+    data_dict = default_collate(batch)
+    data_dict["locs_scaled"] = torch.cat(locs_scaled, 0)
+    data_dict["batch_offsets"] = torch.tensor(batch_offsets, dtype=torch.int)
+    data_dict["gt_proposals_idx"] = torch.cat(gt_proposals_idx, 0)
+    data_dict["gt_proposals_offset"] = torch.cat(gt_proposals_offset, 0)
+    data_dict["instances_bboxes_tmp"] = torch.cat(instances_bboxes_tmp, 0)
+    data_dict["voxel_locs"], data_dict["p2v_map"], data_dict["v2p_map"] = pointgroup_ops.voxelization_idx(data_dict["locs_scaled"], len(batch), 4)
+
+    data_dict["feats"] = torch.cat(me_feats, 0)
+
+    return data_dict
+
 
 def get_model(args, DC, dataset):
     # load model
@@ -189,7 +257,7 @@ def eval_ref(args):
             lang_acc = []
             predictions = {}
             for data in tqdm(dataloader):
-                if SCANREFER_PLUS_PLUS:
+                if SCANREFER_ENHANCE:
                     # scanrefer++ support
                     for scene_id in data["scene_id"]:
                         if scene_id not in final_output:
@@ -261,13 +329,15 @@ def eval_ref(args):
             with open(pred_path, "wb") as f:
                 pickle.dump(predictions, f)
 
+
             # scanrefer+= support
-            if SCANREFER_PLUS_PLUS:
+            if SCANREFER_ENHANCE:
+                dir_name = f"scanrefer++_test_{SCANREFER_ENHANCE_LOSS_THRESHOLD}_{SCANREFER_ENHANCE_EVAL_THRESHOLD}_{SCANREFER_ENHANCE_VANILLE}_{USE_GT}"
                 for key, value in final_output.items():
                     for query in value:
                         query["aabbs"] = [item.tolist() for item in query["aabbs"]]
-                    os.makedirs("scanrefer++_test", exist_ok=True)
-                    with open(f"scanrefer++_test/{key}.json", "w") as f:
+                    os.makedirs(dir_name, exist_ok=True)
+                    with open(f"{dir_name}/{key}.json", "w") as f:
                         json.dump(value, f)
             # end
 

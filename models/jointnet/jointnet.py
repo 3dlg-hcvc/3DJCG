@@ -1,13 +1,11 @@
 import torch
 import torch.nn as nn
-import numpy as np
-import sys
-import os
+from macro import *
 
 from models.base_module.backbone_module import Pointnet2Backbone
 from models.base_module.voting_module import VotingModule
 from models.base_module.lang_module import LangModule
-
+from models.gt_detector import GTDetector
 from models.proposal_module.proposal_module_fcos import ProposalModule
 from models.proposal_module.relation_module import RelationModule
 from models.refnet.match_module import MatchModule
@@ -38,10 +36,13 @@ class JointNet(nn.Module):
 
         # --------- PROPOSAL GENERATION ---------
         # Backbone point feature learning
-        self.backbone_net = Pointnet2Backbone(input_feature_dim=self.input_feature_dim)
+        if not USE_GT:
+            self.backbone_net = Pointnet2Backbone(input_feature_dim=self.input_feature_dim)
 
-        # Hough voting
-        self.vgen = VotingModule(self.vote_factor, 256)
+            # Hough voting
+            self.vgen = VotingModule(self.vote_factor, 256)
+        else:
+            self.backbone_net = GTDetector()
 
         # Vote aggregation and object proposal
         self.proposal = ProposalModule(num_class, num_heading_bin, num_size_cluster, mean_size_arr, num_proposal, sampling)
@@ -90,24 +91,30 @@ class JointNet(nn.Module):
         #                                     #
         #######################################
 
-        # --------- HOUGH VOTING ---------
-        data_dict = self.backbone_net(data_dict)
+        if not USE_GT:
+            # --------- HOUGH VOTING ---------
+            data_dict = self.backbone_net(data_dict)
 
-        # --------- HOUGH VOTING ---------
-        xyz = data_dict["fp2_xyz"]
-        features = data_dict["fp2_features"]
-        data_dict["seed_inds"] = data_dict["fp2_inds"]
-        data_dict["seed_xyz"] = xyz
-        data_dict["seed_features"] = features
+            # --------- HOUGH VOTING ---------
+            xyz = data_dict["fp2_xyz"]
+            features = data_dict["fp2_features"]
+            data_dict["seed_inds"] = data_dict["fp2_inds"]
+            data_dict["seed_xyz"] = xyz
+            data_dict["seed_features"] = features
 
-        xyz, features = self.vgen(xyz, features)
-        features_norm = torch.norm(features, p=2, dim=1)
-        features = features.div(features_norm.unsqueeze(1))
-        data_dict["vote_xyz"] = xyz
-        data_dict["vote_features"] = features
+            xyz, features = self.vgen(xyz, features)
+            features_norm = torch.norm(features, p=2, dim=1)
+            features = features.div(features_norm.unsqueeze(1))
 
-        # --------- PROPOSAL GENERATION ---------
-        data_dict = self.proposal(xyz, features, data_dict)
+            data_dict["vote_xyz"] = xyz
+            data_dict["vote_features"] = features
+
+            # --------- PROPOSAL GENERATION ---------
+            data_dict = self.proposal(xyz, features, data_dict)
+        else:
+            data_dict = self.backbone_net.feed(data_dict)
+            #data_dict["seed_inds"] =
+
         data_dict = self.relation(data_dict)
 
         if not self.no_reference:

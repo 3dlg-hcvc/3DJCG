@@ -5,12 +5,11 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 import os
 import sys
 import json
-import h5py
 import argparse
-import importlib
 import torch
-import torch.optim as optim
-import torch.nn as nn
+from torch.utils.data._utils.collate import default_collate
+
+
 import numpy as np
 
 from torch.utils.data import DataLoader
@@ -19,6 +18,7 @@ from copy import deepcopy
 
 sys.path.append(os.path.join(os.getcwd())) # HACK add the root folder
 from data.scannet.model_util_scannet import ScannetDatasetConfig
+from lib.pointgroup_ops.functions import pointgroup_ops
 from lib.joint.dataset import ScannetReferenceDataset
 from lib.joint.solver_3djcg import Solver
 from lib.configs.config_joint import CONF
@@ -26,7 +26,7 @@ from models.jointnet.jointnet import JointNet
 from scripts.utils.AdamW import AdamW
 from scripts.utils.script_utils import set_params_lr_dict
 
-from crash_on_ipy import *
+from macro import *
 
 # SCANREFER_DUMMY = json.load(open(os.path.join(CONF.PATH.DATA, "ScanRefer_dummy.json")))
 
@@ -48,8 +48,8 @@ def get_dataloader(args, scanrefer, scanrefer_new, all_scene_list, split, config
         scanrefer_all_scene=all_scene_list, 
         split=split, 
         name=args.dataset,
-        num_points=args.num_points, 
-        use_height=(not args.no_height),
+        num_points=args.num_points if not USE_GT else 50000,
+        use_height=(not args.no_height) if not USE_GT else False,
         use_color=args.use_color, 
         use_normal=args.use_normal, 
         use_multiview=args.use_multiview,
@@ -59,9 +59,74 @@ def get_dataloader(args, scanrefer, scanrefer_new, all_scene_list, split, config
         scan2cad_rotation=scan2cad_rotation
     )
     # dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
-    dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=4, pin_memory=True)
+    if USE_GT:
+        dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=shuffle, num_workers=4, pin_memory=True,
+                                collate_fn=_collate_fn)
+    else:
+        dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=shuffle, num_workers=4, pin_memory=True)
 
     return dataset, dataloader
+
+def _collate_fn(batch):
+    locs_scaled = []
+    gt_proposals_idx = []
+    gt_proposals_offset = []
+    instances_bboxes_tmp = []
+    me_feats = []
+    batch_offsets = [0]
+    total_num_inst = 0
+    total_points = 0
+    # instance_info = []
+    #instance_offsets = [0]
+    instance_ids = []
+    for i, b in enumerate(batch):
+        locs_scaled.append(
+            torch.cat([
+                torch.LongTensor(b["locs_scaled"].shape[0], 1).fill_(i),
+                torch.from_numpy(b["locs_scaled"]).long()
+            ], 1))
+        batch_offsets.append(batch_offsets[-1] + b["locs_scaled"].shape[0])
+        me_feats.append(torch.cat((torch.from_numpy(b["point_clouds"][:, 3:]), torch.from_numpy(b["point_clouds"][:, 0:3])), 1))
+
+        if "gt_proposals_idx" in b:
+            gt_proposals_idx_i = b["gt_proposals_idx"]
+            gt_proposals_idx_i[:, 0] += total_num_inst
+            gt_proposals_idx_i[:, 1] += total_points
+            gt_proposals_idx.append(torch.from_numpy(b["gt_proposals_idx"]))
+            instances_bboxes_tmp.append(torch.from_numpy(b["instances_bboxes_tmp"]))
+            if gt_proposals_offset != []:
+                gt_proposals_offset_i = b["gt_proposals_offset"]
+                gt_proposals_offset_i += gt_proposals_offset[-1][-1].item()
+                gt_proposals_offset.append(torch.from_numpy(gt_proposals_offset_i[1:]))
+            else:
+                gt_proposals_offset.append(torch.from_numpy(b["gt_proposals_offset"]))
+
+        instance_ids_i = b["instance_ids"]
+        instance_ids_i[np.where(instance_ids_i != 0)] += total_num_inst
+        total_num_inst += b["instances_bboxes_tmp"].shape[0]
+        total_points += len(instance_ids_i)
+        instance_ids.append(torch.from_numpy(instance_ids_i))
+
+        # instance_info.append(torch.from_numpy(b["instance_info"]))
+        # instance_offsets.append(instance_offsets[-1] + b["instances_bboxes_tmp"].shape[0])
+
+        b.pop("instance_ids", None)
+        b.pop("locs_scaled", None)
+        b.pop("gt_proposals_idx", None)
+        b.pop("gt_proposals_offset", None)
+        b.pop("instances_bboxes_tmp", None)
+
+    data_dict = default_collate(batch)
+    data_dict["locs_scaled"] = torch.cat(locs_scaled, 0)
+    data_dict["batch_offsets"] = torch.tensor(batch_offsets, dtype=torch.int)
+    data_dict["gt_proposals_idx"] = torch.cat(gt_proposals_idx, 0)
+    data_dict["gt_proposals_offset"] = torch.cat(gt_proposals_offset, 0)
+    data_dict["instances_bboxes_tmp"] = torch.cat(instances_bboxes_tmp, 0)
+    data_dict["voxel_locs"], data_dict["p2v_map"], data_dict["v2p_map"] = pointgroup_ops.voxelization_idx(data_dict["locs_scaled"], len(batch), 4)
+
+    data_dict["feats"] = torch.cat(me_feats, 0)
+
+    return data_dict
 
 def get_model(args, dataset, device):
     # initiate model

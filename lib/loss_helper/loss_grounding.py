@@ -19,8 +19,8 @@ NEAR_THRESHOLD = 0.3
 GT_VOTE_FACTOR = 3  # number of GT votes per point
 OBJECTNESS_CLS_WEIGHTS = [0.2, 0.8]  # put larger weights on positive objectness
 
-SCANREFER_ENHANCE = True
-SCANREFER_ENHANCE_VANILLE = True
+from macro import *
+
 
 def compute_reference_loss(data_dict, config, no_reference=False):
     """ Compute cluster reference loss
@@ -138,7 +138,7 @@ def compute_reference_loss(data_dict, config, no_reference=False):
                         if data_dict["istrain"][0] == 1 and not no_reference and data_dict["random"] < 0.5:
                             ious = ious * objectness_masks[i]
                         if SCANREFER_ENHANCE_VANILLE:
-                            filtered_ious_indices = np.where(ious >= 0.25)
+                            filtered_ious_indices = np.where(ious >= SCANREFER_ENHANCE_LOSS_THRESHOLD)
                             if filtered_ious_indices[0].shape[0] == 0:
                                 continue
                             labels_new[j, filtered_ious_indices] = 1
@@ -147,7 +147,7 @@ def compute_reference_loss(data_dict, config, no_reference=False):
                     if not SCANREFER_ENHANCE_VANILLE:
                         row_idx, col_idx = linear_sum_assignment(iou_matrix)
                         for index in range(len(row_idx)):
-                            if (iou_matrix[row_idx[index], col_idx[index]] * -1) >= 0.25:
+                            if (iou_matrix[row_idx[index], col_idx[index]] * -1) >= SCANREFER_ENHANCE_LOSS_THRESHOLD:
                                 labels_new[j, col_idx[index]] = 1
 
 
@@ -193,45 +193,48 @@ def get_loss(data_dict, config, detection=True, reference=True, use_lang_classif
         data_dict: dict
     """
     # Vote loss
-    vote_loss = compute_vote_loss(data_dict)
+    if not USE_GT:
+        vote_loss = compute_vote_loss(data_dict)
 
-    # Obj loss
-    objectness_loss, objectness_label, objectness_mask, object_assignment = compute_objectness_loss(data_dict)
-    num_proposal = objectness_label.shape[1]
-    total_num_proposal = objectness_label.shape[0]*objectness_label.shape[1]
-    data_dict["objectness_label"] = objectness_label
-    data_dict["objectness_mask"] = objectness_mask
-    data_dict["object_assignment"] = object_assignment
-    data_dict["pos_ratio"] = torch.sum(objectness_label.float())/float(total_num_proposal)
-    data_dict["neg_ratio"] = torch.sum(objectness_mask.float())/float(total_num_proposal) - data_dict["pos_ratio"]
+        # Obj loss
+        objectness_loss, objectness_label, objectness_mask, object_assignment = compute_objectness_loss(data_dict)
+        num_proposal = objectness_label.shape[1]
+        total_num_proposal = objectness_label.shape[0]*objectness_label.shape[1]
+        data_dict["objectness_label"] = objectness_label
+        data_dict["objectness_mask"] = objectness_mask
+        data_dict["object_assignment"] = object_assignment
+        data_dict["pos_ratio"] = torch.sum(objectness_label.float())/float(total_num_proposal)
+        data_dict["neg_ratio"] = torch.sum(objectness_mask.float())/float(total_num_proposal) - data_dict["pos_ratio"]
 
-    # Box loss and sem cls loss
-    heading_cls_loss, heading_reg_loss, size_distance_loss, sem_cls_loss = compute_box_and_sem_cls_loss(data_dict, config)
-    box_loss = 0.1 * heading_cls_loss + heading_reg_loss + 0.1 * sem_cls_loss
-    box_loss = box_loss + 20 * size_distance_loss
+        # Box loss and sem cls loss
+        heading_cls_loss, heading_reg_loss, size_distance_loss, sem_cls_loss = compute_box_and_sem_cls_loss(data_dict, config)
+        box_loss = 0.1 * heading_cls_loss + heading_reg_loss + 0.1 * sem_cls_loss
+        box_loss = box_loss + 20 * size_distance_loss
 
-    # objectness; Nothing
-    obj_pred_val = torch.argmax(data_dict["objectness_scores"], 2) # B,K
-    obj_acc = torch.sum((obj_pred_val==data_dict["objectness_label"].long()).float()*data_dict["objectness_mask"])/(torch.sum(data_dict["objectness_mask"])+1e-6)
-    data_dict["obj_acc"] = obj_acc
+        # objectness; Nothing
+        obj_pred_val = torch.argmax(data_dict["objectness_scores"], 2) # B,K
+        obj_acc = torch.sum((obj_pred_val==data_dict["objectness_label"].long()).float()*data_dict["objectness_mask"])/(torch.sum(data_dict["objectness_mask"])+1e-6)
+        data_dict["obj_acc"] = obj_acc
 
     if detection:
-        data_dict["vote_loss"] = vote_loss
-        data_dict["objectness_loss"] = objectness_loss
-        data_dict["heading_cls_loss"] = heading_cls_loss
-        data_dict["heading_reg_loss"] = heading_reg_loss
-        data_dict["size_distance_loss"] = size_distance_loss
-        data_dict["sem_cls_loss"] = sem_cls_loss
-        data_dict["box_loss"] = box_loss
+        if not USE_GT:
+            data_dict["vote_loss"] = vote_loss
+            data_dict["objectness_loss"] = objectness_loss
+            data_dict["heading_cls_loss"] = heading_cls_loss
+            data_dict["heading_reg_loss"] = heading_reg_loss
+            data_dict["size_distance_loss"] = size_distance_loss
+            data_dict["sem_cls_loss"] = sem_cls_loss
+            data_dict["box_loss"] = box_loss
     else:
-        device = vote_loss.device()
-        data_dict["vote_loss"] = torch.zeros(1)[0].to(device)
-        data_dict["objectness_loss"] = torch.zeros(1)[0].to(device)
-        data_dict["heading_cls_loss"] = torch.zeros(1)[0].to(device)
-        data_dict["heading_reg_loss"] = torch.zeros(1)[0].to(device)
-        data_dict["size_distance_loss"] = torch.zeros(1)[0].to(device)
-        data_dict["sem_cls_loss"] = torch.zeros(1)[0].to(device)
-        data_dict["box_loss"] = torch.zeros(1)[0].to(device)
+        if not USE_GT:
+            device = vote_loss.device()
+            data_dict["vote_loss"] = torch.zeros(1)[0].to(device)
+            data_dict["objectness_loss"] = torch.zeros(1)[0].to(device)
+            data_dict["heading_cls_loss"] = torch.zeros(1)[0].to(device)
+            data_dict["heading_reg_loss"] = torch.zeros(1)[0].to(device)
+            data_dict["size_distance_loss"] = torch.zeros(1)[0].to(device)
+            data_dict["sem_cls_loss"] = torch.zeros(1)[0].to(device)
+            data_dict["box_loss"] = torch.zeros(1)[0].to(device)
 
     if reference:
         # Reference loss
@@ -261,7 +264,7 @@ def get_loss(data_dict, config, detection=True, reference=True, use_lang_classif
     loss = 0
 
     # Final loss function
-    if detection:
+    if detection and not USE_GT:
         # sem_cls loss is included in the box_loss
         # detection_loss = detection_loss + 0.1 * data_dict['sem_cls_loss']
         detection_loss = data_dict["vote_loss"] + 0.1*data_dict["objectness_loss"] + 1.0*data_dict["box_loss"]

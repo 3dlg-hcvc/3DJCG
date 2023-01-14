@@ -19,7 +19,7 @@ from lib.joint.eval_caption import eval_cap
 from lib.joint.eval_ground import get_eval as eval_ground
 from utils.eta import decode_eta
 from lib.pointnet2.pytorch_utils import BNMomentumScheduler
-SCANREFER_PLUS_PLUS = True
+from macro import *
 
 ITER_REPORT_TEMPLATE = """
 -------------------------------iter: [{epoch_id}: {iter_id}/{total_iter}]-------------------------------
@@ -254,44 +254,41 @@ class Solver():
         
         for epoch_id in range(epoch):
             torch.cuda.empty_cache()
-            try:
-                self._log("epoch {} starting...".format(epoch_id + 1))
 
-                if self.lr_scheduler:
-                    # self.lr_scheduler.step()
-                    print("learning rate --> {}\n".format(self.lr_scheduler.get_lr()), flush=True)
-                    # now_lr = self.lr_scheduler.get_lr()[0]
-                    for (idx, param_group) in enumerate(self.optimizer.param_groups):
-                        # print(param_group.keys(), '<< param key shape')
-                        print('[LR Param Group]', param_group['Param_Name'], param_group['lr'], '<< should', flush=True)
-                        # param_group['lr'] = base_group_lr[idx] / base_lr * now_lr
+            self._log("epoch {} starting...".format(epoch_id + 1))
 
-                # feed
-                self.dataloader['train'].dataset.shuffle_data()
-                self._feed(self.dataloader["train"], "train", epoch_id)
+            if self.lr_scheduler:
+                # self.lr_scheduler.step()
+                print("learning rate --> {}\n".format(self.lr_scheduler.get_last_lr()), flush=True)
+                # now_lr = self.lr_scheduler.get_lr()[0]
+                for (idx, param_group) in enumerate(self.optimizer.param_groups):
+                    # print(param_group.keys(), '<< param key shape')
+                    print('[LR Param Group]', param_group['Param_Name'], param_group['lr'], '<< should', flush=True)
+                    # param_group['lr'] = base_group_lr[idx] / base_lr * now_lr
 
-                # save model
-                self._log("saving last models...\n")
-                model_root = os.path.join(CONF.PATH.OUTPUT, self.stamp)
-                torch.save(self.model.state_dict(), os.path.join(model_root, "model_last.pth"))
+            # feed
+            self.dataloader['train'].dataset.shuffle_data()
+            self._feed(self.dataloader["train"], "train", epoch_id)
 
-                # update lr scheduler
-                if self.lr_scheduler:
-                    print("update learning rate --> {}\n".format(self.lr_scheduler.get_lr()))
-                    self.lr_scheduler.step()
 
-                # update bn scheduler
-                if self.bn_scheduler:
-                    print("update batch normalization momentum --> {}\n".format(self.bn_scheduler.lmbd(self.bn_scheduler.last_epoch)))
-                    self.bn_scheduler.step()
+            # update lr scheduler
+            if self.lr_scheduler:
+                print("update learning rate --> {}\n".format(self.lr_scheduler.get_last_lr()))
+                self.lr_scheduler.step()
 
-                if epoch_id % 10 == 0 and epoch_id != 0:
-                    self._finish(epoch_id)
-                
-            except KeyboardInterrupt:
-                # finish training
+            # update bn scheduler
+            if self.bn_scheduler:
+                print("update batch normalization momentum --> {}\n".format(self.bn_scheduler.lmbd(self.bn_scheduler.last_epoch)))
+                self.bn_scheduler.step()
+
+            if epoch_id % 10 == 0 and epoch_id != 0:
+                torch.cuda.empty_cache()
+                self._feed(self.dataloader["eval"]["val"], "val", epoch_id, is_eval=True)
+                self._dump_log("val", True)
+                self._epoch_report(epoch_id)
                 self._finish(epoch_id)
-                exit()
+                
+
 
         # finish training
         self._finish(epoch_id)
@@ -463,23 +460,27 @@ class Solver():
         # store loss
         self._running_log["ref_loss"] = data_dict["ref_loss"]
         self._running_log["lang_loss"] = data_dict["lang_loss"]
+
         self._running_log["cap_loss"] = data_dict["cap_loss"]
         self._running_log["ori_loss"] = data_dict["ori_loss"]
         self._running_log["dist_loss"] = data_dict["dist_loss"]
-        self._running_log["objectness_loss"] = data_dict["objectness_loss"]
-        self._running_log["vote_loss"] = data_dict["vote_loss"]
-        self._running_log["box_loss"] = data_dict["box_loss"]
+        if not USE_GT:
+            self._running_log["objectness_loss"] = data_dict["objectness_loss"]
+            self._running_log["vote_loss"] = data_dict["vote_loss"]
+            self._running_log["box_loss"] = data_dict["box_loss"]
+            self._running_log["obj_acc"] = data_dict["obj_acc"].item()
+            self._running_log["pos_ratio"] = data_dict["pos_ratio"].item()
+            self._running_log["neg_ratio"] = data_dict["neg_ratio"].item()
+
         self._running_log["loss"] = data_dict["loss"]
 
         # store eval
         self._running_log["cap_acc"] = data_dict["cap_acc"].item()
         self._running_log["ori_acc"] = data_dict["ori_acc"].item()
         self._running_log["pred_ious"] = data_dict["pred_ious"].item()
-        #self._running_log["obj_acc"] = data_dict["obj_acc"].item()
-        #self._running_log["pos_ratio"] = data_dict["pos_ratio"].item()
-        #self._running_log["neg_ratio"] = data_dict["neg_ratio"].item()
-        #self._running_log["max_iou_rate_0.25"] = np.mean(data_dict["max_iou_rate_0.25"])
-        #self._running_log["max_iou_rate_0.5"] = np.mean(data_dict["max_iou_rate_0.5"])
+        self._running_log["max_iou_rate_0.25"] = np.mean(data_dict["max_iou_rate_0.25"])
+        self._running_log["max_iou_rate_0.5"] = np.mean(data_dict["max_iou_rate_0.5"])
+
 
 
     def _ground_eval(self, data_dict, phase, is_eval, mem_hash=None, final_output=None):
@@ -493,9 +494,13 @@ class Solver():
             # dump
             self._running_log["lang_acc"] = data_dict["lang_acc"].item()
             self._running_log["ref_acc"] = np.mean(data_dict["ref_acc"])
-            self._running_log["obj_acc"] = data_dict["obj_acc"].item()
-            self._running_log["pos_ratio"] = data_dict["pos_ratio"].item()
-            self._running_log["neg_ratio"] = data_dict["neg_ratio"].item()
+            if not USE_GT:
+                self._running_log["objectness_loss"] = data_dict["objectness_loss"]
+                self._running_log["vote_loss"] = data_dict["vote_loss"]
+                self._running_log["box_loss"] = data_dict["box_loss"]
+                self._running_log["obj_acc"] = data_dict["obj_acc"].item()
+                self._running_log["pos_ratio"] = data_dict["pos_ratio"].item()
+                self._running_log["neg_ratio"] = data_dict["neg_ratio"].item()
             self._running_log["iou_rate_0.25"] = np.mean(data_dict["ref_iou_rate_0.25"])
             self._running_log["iou_rate_0.5"] = np.mean(data_dict["ref_iou_rate_0.5"])
             self._running_log["max_iou_rate_0.25"] = np.mean(data_dict["max_iou_rate_0.25"])
@@ -513,9 +518,16 @@ class Solver():
             # dump
             self._running_log["lang_acc"] = data_dict["lang_acc"].item()
             self._running_log["ref_acc"] = np.mean(data_dict["ref_acc"])
-            self._running_log["obj_acc"] = data_dict["obj_acc"].item()
-            self._running_log["pos_ratio"] = data_dict["pos_ratio"].item()
-            self._running_log["neg_ratio"] = data_dict["neg_ratio"].item()
+            if not USE_GT:
+                self._running_log["obj_acc"] = data_dict["obj_acc"].item()
+                self._running_log["pos_ratio"] = data_dict["pos_ratio"].item()
+                self._running_log["neg_ratio"] = data_dict["neg_ratio"].item()
+                self._running_log["objectness_loss"] = data_dict["objectness_loss"]
+                self._running_log["vote_loss"] = data_dict["vote_loss"]
+                self._running_log["box_loss"] = data_dict["box_loss"]
+                self._running_log["obj_acc"] = data_dict["obj_acc"].item()
+                self._running_log["pos_ratio"] = data_dict["pos_ratio"].item()
+                self._running_log["neg_ratio"] = data_dict["neg_ratio"].item()
             self._running_log["iou_rate_0.25"] = np.mean(data_dict["ref_iou_rate_0.25"])
             self._running_log["iou_rate_0.5"] = np.mean(data_dict["ref_iou_rate_0.5"])
             self._running_log["max_iou_rate_0.25"] = np.mean(data_dict["max_iou_rate_0.25"])
@@ -670,18 +682,21 @@ class Solver():
                 self.log[phase]["cap_loss"].append(self._running_log["cap_loss"].item())
                 self.log[phase]["ori_loss"].append(self._running_log["ori_loss"].item())
                 self.log[phase]["dist_loss"].append(self._running_log["dist_loss"].item())
-                self.log[phase]["objectness_loss"].append(self._running_log["objectness_loss"].item())
-                self.log[phase]["vote_loss"].append(self._running_log["vote_loss"].item())
-                self.log[phase]["box_loss"].append(self._running_log["box_loss"].item())
+                if not USE_GT:
+                    self.log[phase]["objectness_loss"].append(self._running_log["objectness_loss"].item())
+                    self.log[phase]["vote_loss"].append(self._running_log["vote_loss"].item())
+                    self.log[phase]["box_loss"].append(self._running_log["box_loss"].item())
+                    self.log[phase]["obj_acc"].append(self._running_log["obj_acc"])
+                    self.log[phase]["pos_ratio"].append(self._running_log["pos_ratio"])
+                    self.log[phase]["neg_ratio"].append(self._running_log["neg_ratio"])
 
                 self.log[phase]["lang_acc"].append(self._running_log["lang_acc"])
                 self.log[phase]["ref_acc"].append(self._running_log["ref_acc"])
                 self.log[phase]["cap_acc"].append(self._running_log["cap_acc"])
                 self.log[phase]["ori_acc"].append(self._running_log["ori_acc"])
-                self.log[phase]["obj_acc"].append(self._running_log["obj_acc"])
+
                 self.log[phase]["pred_ious"].append(self._running_log["pred_ious"])
-                self.log[phase]["pos_ratio"].append(self._running_log["pos_ratio"])
-                self.log[phase]["neg_ratio"].append(self._running_log["neg_ratio"])
+
                 self.log[phase]["iou_rate_0.25"].append(self._running_log["iou_rate_0.25"])
                 self.log[phase]["iou_rate_0.5"].append(self._running_log["iou_rate_0.5"])
                 self.log[phase]["max_iou_rate_0.25"].append(self._running_log["max_iou_rate_0.25"])
@@ -700,27 +715,6 @@ class Solver():
                     if (self._global_iter_id + 1) % self.verbose == 0:
                         self._train_report(epoch_id)
 
-                    # evaluation
-                    if epoch_id >= self.num_ground_epoch:
-                        new_val_step = self.val_step // 2
-                    else:
-                        new_val_step = self.val_step * 2
-                    if self._global_iter_id % new_val_step == 0 and self._global_iter_id != 0:
-                        # eval on train
-                        print("evaluating on train...")
-                        with torch.no_grad():
-                            self._feed(self.dataloader["eval"]["train"], "train", epoch_id, is_eval=True)
-                            self._dump_log("train", True)
-
-                            # val
-
-                            print("evaluating on val...")
-                            self._feed(self.dataloader["eval"]["val"], "val", epoch_id, is_eval=True)
-                            self._dump_log("val", True)
-
-                            self._set_phase("train")
-                            self._epoch_report(epoch_id)
-
                     # dump log
                     if self._global_iter_id % 50 == 0:
                         self._dump_log("train")
@@ -733,7 +727,7 @@ class Solver():
 
             self._eval(phase, epoch_id)
             if phase == "val":
-                if SCANREFER_PLUS_PLUS:
+                if SCANREFER_ENHANCE:
                     final_output = {}
                     mem_hash = {}
 
@@ -744,7 +738,7 @@ class Solver():
                         if key != "scene_id":
                             data_dict[key] = data_dict[key].to(self.device)
                     # scanrefer++ support
-                    if SCANREFER_PLUS_PLUS:
+                    if SCANREFER_ENHANCE:
                         for scene_id in data_dict["scene_id"]:
                             if scene_id not in final_output:
                                 final_output[scene_id] = []
@@ -781,30 +775,34 @@ class Solver():
                         self.log[phase]["loss"].append(self._running_log["loss"].item())
                         self.log[phase]["ref_loss"].append(self._running_log["ref_loss"].item())
                         self.log[phase]["lang_loss"].append(self._running_log["lang_loss"].item())
-                        self.log[phase]["objectness_loss"].append(self._running_log["objectness_loss"].item())
-                        self.log[phase]["vote_loss"].append(self._running_log["vote_loss"].item())
-                        self.log[phase]["box_loss"].append(self._running_log["box_loss"].item())
+                        if not USE_GT:
+                            self.log[phase]["objectness_loss"].append(self._running_log["objectness_loss"].item())
+                            self.log[phase]["vote_loss"].append(self._running_log["vote_loss"].item())
+                            self.log[phase]["box_loss"].append(self._running_log["box_loss"].item())
+                            self.log[phase]["obj_acc"].append(self._running_log["obj_acc"])
+                            self.log[phase]["pos_ratio"].append(self._running_log["pos_ratio"])
+                            self.log[phase]["neg_ratio"].append(self._running_log["neg_ratio"])
 
                         self.log[phase]["lang_acc"].append(self._running_log["lang_acc"])
                         self.log[phase]["ref_acc"].append(self._running_log["ref_acc"])
-                        self.log[phase]["obj_acc"].append(self._running_log["obj_acc"])
-                        self.log[phase]["pos_ratio"].append(self._running_log["pos_ratio"])
-                        self.log[phase]["neg_ratio"].append(self._running_log["neg_ratio"])
+
+
                         self.log[phase]["iou_rate_0.25"].append(self._running_log["iou_rate_0.25"])
                         self.log[phase]["iou_rate_0.5"].append(self._running_log["iou_rate_0.5"])
                         self.log[phase]["max_iou_rate_0.25"].append(self._running_log["max_iou_rate_0.25"])
                         self.log[phase]["max_iou_rate_0.5"].append(self._running_log["max_iou_rate_0.5"])
 
                 # scanrefer+= support
-                if SCANREFER_PLUS_PLUS and phase == "val":
+                if SCANREFER_ENHANCE and phase == "val":
+                    dir_name = f"scanrefer++_test_{SCANREFER_ENHANCE_LOSS_THRESHOLD}_{SCANREFER_ENHANCE_EVAL_THRESHOLD}_{SCANREFER_ENHANCE_VANILLE}_{USE_GT}"
                     for key, value in final_output.items():
                         for query in value:
                             query["aabbs"] = [item.tolist() for item in query["aabbs"]]
-                        os.makedirs("scanrefer++_test", exist_ok=True)
-                        with open(f"scanrefer++_test/{key}.json", "w") as f:
+                        os.makedirs(dir_name, exist_ok=True)
+                        with open(f"{dir_name}/{key}.json", "w") as f:
                             json.dump(value, f)
 
-                    all_preds, all_gts = load_gt_and_pred_jsons_from_disk("scanrefer++_test", "3dvg_gt")
+                    all_preds, all_gts = load_gt_and_pred_jsons_from_disk(dir_name, "3dvg_gt")
                     iou_25_results, iou_50_results = evaluate_all_scenes(all_preds, all_gts)
                     self.log[phase]["scanrefer++_overall_25"] = iou_25_results["overall"]
                     self.log[phase]["scanrefer++_overall_50"] = iou_50_results["overall"]
@@ -817,7 +815,7 @@ class Solver():
                 ground_metrics = ["iou_rate_0.25", "iou_rate_0.5"]
                 ground_cur_best = np.sum([np.mean(self.log[phase][m]) for m in ground_metrics])
                 cur_best = caption_cur_best + ground_cur_best * 2
-                if SCANREFER_PLUS_PLUS:
+                if SCANREFER_ENHANCE:
                     cur_criterion = "scanrefer++_overall_50"
                     ground_cur_best = self.log[phase]["scanrefer++_overall_50"]
                     cur_best = self.log[phase]["scanrefer++_overall_50"]
@@ -826,8 +824,6 @@ class Solver():
                 caption_cur_best = 0.
                 ground_cur_best = 0.
                 cur_best = 0.
-
-
 
             if phase == "val" and cur_best > self.best[cur_criterion]:
                 self._log("best {} achieved: {}".format(cur_criterion, cur_best))
@@ -857,7 +853,6 @@ class Solver():
 
             if phase == "val" and caption_cur_best > self.best["caption_sum"]:
                 self._log("best caption {} achieved: {}".format(cur_criterion, caption_cur_best))
-
                 self.best["best_caption_epoch"] = epoch_id + 1
                 self.best["best_caption_bleu-4"] = self.log[phase]["bleu-4"]
                 self.best["best_caption_cider"] = self.log[phase]["cider"]
@@ -932,123 +927,236 @@ class Solver():
         eta = decode_eta(eta_sec)
 
         # print report
-        iter_report = self.__iter_report_template.format(
-            epoch_id=epoch_id + 1,
-            iter_id=self._global_iter_id + 1,
-            total_iter=self._total_iter["train"],
-            train_loss=round(np.mean([v for v in self.log["train"]["loss"]]), 5),
-            train_ref_loss=round(np.mean([v for v in self.log["train"]["ref_loss"]]), 5),
-            train_lang_loss=round(np.mean([v for v in self.log["train"]["lang_loss"]]), 5),
-            train_cap_loss=round(np.mean([v for v in self.log["train"]["cap_loss"]]), 5),
-            train_ori_loss=round(np.mean([v for v in self.log["train"]["ori_loss"]]), 5),
-            train_dist_loss=round(np.mean([v for v in self.log["train"]["dist_loss"]]), 5),
-            train_objectness_loss=round(np.mean([v for v in self.log["train"]["objectness_loss"]]), 5),
-            train_vote_loss=round(np.mean([v for v in self.log["train"]["vote_loss"]]), 5),
-            train_box_loss=round(np.mean([v for v in self.log["train"]["box_loss"]]), 5),
-            train_lang_acc=round(np.mean([v for v in self.log["train"]["lang_acc"]]), 5),
-            train_ref_acc=round(np.mean([v for v in self.log["train"]["ref_acc"]]), 5),
-            train_cap_acc=round(np.mean([v for v in self.log["train"]["cap_acc"]]), 5),
-            train_ori_acc=round(np.mean([v for v in self.log["train"]["ori_acc"]]), 5),
-            train_obj_acc=round(np.mean([v for v in self.log["train"]["obj_acc"]]), 5),
-            train_iou_rate_25=round(np.mean([v for v in self.log["train"]["iou_rate_0.25"]]), 5),
-            train_iou_rate_5=round(np.mean([v for v in self.log["train"]["iou_rate_0.5"]]), 5),
-            train_iou_max_rate_25=round(np.mean([v for v in self.log["train"]["max_iou_rate_0.25"]]), 5),
-            train_iou_max_rate_5=round(np.mean([v for v in self.log["train"]["max_iou_rate_0.5"]]), 5),
-            train_pos_ratio=round(np.mean([v for v in self.log["train"]["pos_ratio"]]), 5),
-            train_neg_ratio=round(np.mean([v for v in self.log["train"]["neg_ratio"]]), 5),
-            train_pred_ious=round(np.mean([v for v in self.log["train"]["pred_ious"]]), 5),
-            mean_fetch_time=round(np.mean(fetch_time), 5),
-            mean_forward_time=round(np.mean(forward_time), 5),
-            mean_backward_time=round(np.mean(backward_time), 5),
-            mean_eval_time=round(np.mean(eval_time), 5),
-            mean_iter_time=round(np.mean(iter_time), 5),
-            mean_real_time=round(np.mean(real_time), 5),
-            eta_h=eta["h"],
-            eta_m=eta["m"],
-            eta_s=eta["s"]
-        )
+        if not USE_GT:
+            iter_report = self.__iter_report_template.format(
+                epoch_id=epoch_id + 1,
+                iter_id=self._global_iter_id + 1,
+                total_iter=self._total_iter["train"],
+                train_loss=round(np.mean([v for v in self.log["train"]["loss"]]), 5),
+                train_ref_loss=round(np.mean([v for v in self.log["train"]["ref_loss"]]), 5),
+                train_lang_loss=round(np.mean([v for v in self.log["train"]["lang_loss"]]), 5),
+                train_cap_loss=round(np.mean([v for v in self.log["train"]["cap_loss"]]), 5),
+                train_ori_loss=round(np.mean([v for v in self.log["train"]["ori_loss"]]), 5),
+                train_dist_loss=round(np.mean([v for v in self.log["train"]["dist_loss"]]), 5),
+                train_objectness_loss=round(np.mean([v for v in self.log["train"]["objectness_loss"]]), 5),
+                train_vote_loss=round(np.mean([v for v in self.log["train"]["vote_loss"]]), 5),
+                train_box_loss=round(np.mean([v for v in self.log["train"]["box_loss"]]), 5),
+                train_lang_acc=round(np.mean([v for v in self.log["train"]["lang_acc"]]), 5),
+                train_ref_acc=round(np.mean([v for v in self.log["train"]["ref_acc"]]), 5),
+                train_cap_acc=round(np.mean([v for v in self.log["train"]["cap_acc"]]), 5),
+                train_ori_acc=round(np.mean([v for v in self.log["train"]["ori_acc"]]), 5),
+                train_obj_acc=round(np.mean([v for v in self.log["train"]["obj_acc"]]), 5),
+                train_iou_rate_25=round(np.mean([v for v in self.log["train"]["iou_rate_0.25"]]), 5),
+                train_iou_rate_5=round(np.mean([v for v in self.log["train"]["iou_rate_0.5"]]), 5),
+                train_iou_max_rate_25=round(np.mean([v for v in self.log["train"]["max_iou_rate_0.25"]]), 5),
+                train_iou_max_rate_5=round(np.mean([v for v in self.log["train"]["max_iou_rate_0.5"]]), 5),
+                train_pos_ratio=round(np.mean([v for v in self.log["train"]["pos_ratio"]]), 5),
+                train_neg_ratio=round(np.mean([v for v in self.log["train"]["neg_ratio"]]), 5),
+                train_pred_ious=round(np.mean([v for v in self.log["train"]["pred_ious"]]), 5),
+                mean_fetch_time=round(np.mean(fetch_time), 5),
+                mean_forward_time=round(np.mean(forward_time), 5),
+                mean_backward_time=round(np.mean(backward_time), 5),
+                mean_eval_time=round(np.mean(eval_time), 5),
+                mean_iter_time=round(np.mean(iter_time), 5),
+                mean_real_time=round(np.mean(real_time), 5),
+                eta_h=eta["h"],
+                eta_m=eta["m"],
+                eta_s=eta["s"]
+            )
+        else:
+            iter_report = self.__iter_report_template.format(
+                epoch_id=epoch_id + 1,
+                iter_id=self._global_iter_id + 1,
+                total_iter=self._total_iter["train"],
+                train_loss=round(np.mean([v for v in self.log["train"]["loss"]]), 5),
+                train_ref_loss=round(np.mean([v for v in self.log["train"]["ref_loss"]]), 5),
+                train_lang_loss=round(np.mean([v for v in self.log["train"]["lang_loss"]]), 5),
+                train_cap_loss=round(np.mean([v for v in self.log["train"]["cap_loss"]]), 5),
+                train_ori_loss=0,
+                train_dist_loss=round(np.mean([v for v in self.log["train"]["dist_loss"]]), 5),
+                train_objectness_loss=0,
+                train_vote_loss=0,
+                train_box_loss=0,
+                train_lang_acc=round(np.mean([v for v in self.log["train"]["lang_acc"]]), 5),
+                train_ref_acc=round(np.mean([v for v in self.log["train"]["ref_acc"]]), 5),
+                train_cap_acc=round(np.mean([v for v in self.log["train"]["cap_acc"]]), 5),
+                train_ori_acc=0,
+                train_obj_acc=0,
+                train_iou_rate_25=round(np.mean([v for v in self.log["train"]["iou_rate_0.25"]]), 5),
+                train_iou_rate_5=round(np.mean([v for v in self.log["train"]["iou_rate_0.5"]]), 5),
+                train_iou_max_rate_25=round(np.mean([v for v in self.log["train"]["max_iou_rate_0.25"]]), 5),
+                train_iou_max_rate_5=round(np.mean([v for v in self.log["train"]["max_iou_rate_0.5"]]), 5),
+                train_pos_ratio=0,
+                train_neg_ratio=0,
+                train_pred_ious=0,
+                mean_fetch_time=round(np.mean(fetch_time), 5),
+                mean_forward_time=round(np.mean(forward_time), 5),
+                mean_backward_time=round(np.mean(backward_time), 5),
+                mean_eval_time=round(np.mean(eval_time), 5),
+                mean_iter_time=round(np.mean(iter_time), 5),
+                mean_real_time=round(np.mean(real_time), 5),
+                eta_h=eta["h"],
+                eta_m=eta["m"],
+                eta_s=eta["s"]
+            )
         self._log(iter_report)
 
     def _epoch_report(self, epoch_id):
         self._log("epoch [{}/{}] done...".format(epoch_id+1, self.epoch))
         self._log_eval("epoch [{}/{}] done...".format(epoch_id + 1, self.epoch))
-        epoch_report = self.__epoch_report_template.format(
-            train_bleu_1=round(self.log["train"]["bleu-1"], 5),
-            train_bleu_2=round(self.log["train"]["bleu-2"], 5),
-            train_bleu_3=round(self.log["train"]["bleu-3"], 5),
-            train_bleu_4=round(self.log["train"]["bleu-4"], 5),
-            train_cider=round(self.log["train"]["cider"], 5),
-            train_rouge=round(self.log["train"]["rouge"], 5),
-            train_meteor=round(self.log["train"]["meteor"], 5),
-            train_loss=round(np.mean([v for v in self.log["train"]["loss"]]), 5),
-            train_ref_loss=round(np.mean([v for v in self.log["train"]["ref_loss"]]), 5),
-            train_lang_loss=round(np.mean([v for v in self.log["train"]["lang_loss"]]), 5),
-            train_objectness_loss=round(np.mean([v for v in self.log["train"]["objectness_loss"]]), 5),
-            train_vote_loss=round(np.mean([v for v in self.log["train"]["vote_loss"]]), 5),
-            train_box_loss=round(np.mean([v for v in self.log["train"]["box_loss"]]), 5),
-            train_lang_acc=round(np.mean([v for v in self.log["train"]["lang_acc"]]), 5),
-            train_ref_acc=round(np.mean([v for v in self.log["train"]["ref_acc"]]), 5),
-            train_obj_acc=round(np.mean([v for v in self.log["train"]["obj_acc"]]), 5),
-            train_pos_ratio=round(np.mean([v for v in self.log["train"]["pos_ratio"]]), 5),
-            train_neg_ratio=round(np.mean([v for v in self.log["train"]["neg_ratio"]]), 5),
-            train_iou_rate_25=round(np.mean([v for v in self.log["train"]["iou_rate_0.25"]]), 5),
-            train_iou_rate_5=round(np.mean([v for v in self.log["train"]["iou_rate_0.5"]]), 5),
-            train_max_iou_rate_25=round(np.mean([v for v in self.log["train"]["max_iou_rate_0.25"]]), 5),
-            train_max_iou_rate_5=round(np.mean([v for v in self.log["train"]["max_iou_rate_0.5"]]), 5),
-            val_bleu_1=round(self.log["val"]["bleu-1"], 5),
-            val_bleu_2=round(self.log["val"]["bleu-2"], 5),
-            val_bleu_3=round(self.log["val"]["bleu-3"], 5),
-            val_bleu_4=round(self.log["val"]["bleu-4"], 5),
-            val_cider=round(self.log["val"]["cider"], 5),
-            val_rouge=round(self.log["val"]["rouge"], 5),
-            val_meteor=round(self.log["val"]["meteor"], 5),
-            val_loss=round(np.mean([v for v in self.log["val"]["loss"]]), 5),
-            val_ref_loss=round(np.mean([v for v in self.log["val"]["ref_loss"]]), 5),
-            val_lang_loss=round(np.mean([v for v in self.log["val"]["lang_loss"]]), 5),
-            val_objectness_loss=round(np.mean([v for v in self.log["val"]["objectness_loss"]]), 5),
-            val_vote_loss=round(np.mean([v for v in self.log["val"]["vote_loss"]]), 5),
-            val_box_loss=round(np.mean([v for v in self.log["val"]["box_loss"]]), 5),
-            val_lang_acc=round(np.mean([v for v in self.log["val"]["lang_acc"]]), 5),
-            val_ref_acc=round(np.mean([v for v in self.log["val"]["ref_acc"]]), 5),
-            val_obj_acc=round(np.mean([v for v in self.log["val"]["obj_acc"]]), 5),
-            val_pos_ratio=round(np.mean([v for v in self.log["val"]["pos_ratio"]]), 5),
-            val_neg_ratio=round(np.mean([v for v in self.log["val"]["neg_ratio"]]), 5),
-            val_iou_rate_25=round(np.mean([v for v in self.log["val"]["iou_rate_0.25"]]), 5),
-            val_iou_rate_5=round(np.mean([v for v in self.log["val"]["iou_rate_0.5"]]), 5),
-            val_max_iou_rate_25=round(np.mean([v for v in self.log["val"]["max_iou_rate_0.25"]]), 5),
-            val_max_iou_rate_5=round(np.mean([v for v in self.log["val"]["max_iou_rate_0.5"]]), 5),
-            scanrefer_plus_overall_25=self.log["val"]["scanrefer++_overall_25"],
-            scanrefer_plus_overall_50=self.log["val"]["scanrefer++_overall_50"],
-        )
+        if not USE_GT:
+            epoch_report = self.__epoch_report_template.format(
+                train_bleu_1=round(self.log["train"]["bleu-1"], 5),
+                train_bleu_2=round(self.log["train"]["bleu-2"], 5),
+                train_bleu_3=round(self.log["train"]["bleu-3"], 5),
+                train_bleu_4=round(self.log["train"]["bleu-4"], 5),
+                train_cider=round(self.log["train"]["cider"], 5),
+                train_rouge=round(self.log["train"]["rouge"], 5),
+                train_meteor=round(self.log["train"]["meteor"], 5),
+                train_loss=round(np.mean([v for v in self.log["train"]["loss"]]), 5),
+                train_ref_loss=round(np.mean([v for v in self.log["train"]["ref_loss"]]), 5),
+                train_lang_loss=round(np.mean([v for v in self.log["train"]["lang_loss"]]), 5),
+                train_objectness_loss=round(np.mean([v for v in self.log["train"]["objectness_loss"]]), 5),
+                train_vote_loss=round(np.mean([v for v in self.log["train"]["vote_loss"]]), 5),
+                train_box_loss=round(np.mean([v for v in self.log["train"]["box_loss"]]), 5),
+                train_lang_acc=round(np.mean([v for v in self.log["train"]["lang_acc"]]), 5),
+                train_ref_acc=round(np.mean([v for v in self.log["train"]["ref_acc"]]), 5),
+                train_obj_acc=round(np.mean([v for v in self.log["train"]["obj_acc"]]), 5),
+                train_pos_ratio=round(np.mean([v for v in self.log["train"]["pos_ratio"]]), 5),
+                train_neg_ratio=round(np.mean([v for v in self.log["train"]["neg_ratio"]]), 5),
+                train_iou_rate_25=round(np.mean([v for v in self.log["train"]["iou_rate_0.25"]]), 5),
+                train_iou_rate_5=round(np.mean([v for v in self.log["train"]["iou_rate_0.5"]]), 5),
+                train_max_iou_rate_25=round(np.mean([v for v in self.log["train"]["max_iou_rate_0.25"]]), 5),
+                train_max_iou_rate_5=round(np.mean([v for v in self.log["train"]["max_iou_rate_0.5"]]), 5),
+                val_bleu_1=round(self.log["val"]["bleu-1"], 5),
+                val_bleu_2=round(self.log["val"]["bleu-2"], 5),
+                val_bleu_3=round(self.log["val"]["bleu-3"], 5),
+                val_bleu_4=round(self.log["val"]["bleu-4"], 5),
+                val_cider=round(self.log["val"]["cider"], 5),
+                val_rouge=round(self.log["val"]["rouge"], 5),
+                val_meteor=round(self.log["val"]["meteor"], 5),
+                val_loss=round(np.mean([v for v in self.log["val"]["loss"]]), 5),
+                val_ref_loss=round(np.mean([v for v in self.log["val"]["ref_loss"]]), 5),
+                val_lang_loss=round(np.mean([v for v in self.log["val"]["lang_loss"]]), 5),
+                val_objectness_loss=round(np.mean([v for v in self.log["val"]["objectness_loss"]]), 5),
+                val_vote_loss=round(np.mean([v for v in self.log["val"]["vote_loss"]]), 5),
+                val_box_loss=round(np.mean([v for v in self.log["val"]["box_loss"]]), 5),
+                val_lang_acc=round(np.mean([v for v in self.log["val"]["lang_acc"]]), 5),
+                val_ref_acc=round(np.mean([v for v in self.log["val"]["ref_acc"]]), 5),
+                val_obj_acc=round(np.mean([v for v in self.log["val"]["obj_acc"]]), 5),
+                val_pos_ratio=round(np.mean([v for v in self.log["val"]["pos_ratio"]]), 5),
+                val_neg_ratio=round(np.mean([v for v in self.log["val"]["neg_ratio"]]), 5),
+                val_iou_rate_25=round(np.mean([v for v in self.log["val"]["iou_rate_0.25"]]), 5),
+                val_iou_rate_5=round(np.mean([v for v in self.log["val"]["iou_rate_0.5"]]), 5),
+                val_max_iou_rate_25=round(np.mean([v for v in self.log["val"]["max_iou_rate_0.25"]]), 5),
+                val_max_iou_rate_5=round(np.mean([v for v in self.log["val"]["max_iou_rate_0.5"]]), 5),
+                scanrefer_plus_overall_25=self.log["val"]["scanrefer++_overall_25"],
+                scanrefer_plus_overall_50=self.log["val"]["scanrefer++_overall_50"],
+            )
+        else:
+            epoch_report = self.__epoch_report_template.format(
+                train_bleu_1=round(self.log["train"]["bleu-1"], 5),
+                train_bleu_2=round(self.log["train"]["bleu-2"], 5),
+                train_bleu_3=round(self.log["train"]["bleu-3"], 5),
+                train_bleu_4=round(self.log["train"]["bleu-4"], 5),
+                train_cider=round(self.log["train"]["cider"], 5),
+                train_rouge=round(self.log["train"]["rouge"], 5),
+                train_meteor=round(self.log["train"]["meteor"], 5),
+                train_loss=round(np.mean([v for v in self.log["train"]["loss"]]), 5),
+                train_ref_loss=round(np.mean([v for v in self.log["train"]["ref_loss"]]), 5),
+                train_lang_loss=round(np.mean([v for v in self.log["train"]["lang_loss"]]), 5),
+                train_objectness_loss=0,
+                train_vote_loss=0,
+                train_box_loss=0,
+                train_lang_acc=round(np.mean([v for v in self.log["train"]["lang_acc"]]), 5),
+                train_ref_acc=round(np.mean([v for v in self.log["train"]["ref_acc"]]), 5),
+                train_obj_acc=0,
+                train_pos_ratio=0,
+                train_neg_ratio=0,
+                train_iou_rate_25=round(np.mean([v for v in self.log["train"]["iou_rate_0.25"]]), 5),
+                train_iou_rate_5=round(np.mean([v for v in self.log["train"]["iou_rate_0.5"]]), 5),
+                train_max_iou_rate_25=round(np.mean([v for v in self.log["train"]["max_iou_rate_0.25"]]), 5),
+                train_max_iou_rate_5=round(np.mean([v for v in self.log["train"]["max_iou_rate_0.5"]]), 5),
+                val_bleu_1=round(self.log["val"]["bleu-1"], 5),
+                val_bleu_2=round(self.log["val"]["bleu-2"], 5),
+                val_bleu_3=round(self.log["val"]["bleu-3"], 5),
+                val_bleu_4=round(self.log["val"]["bleu-4"], 5),
+                val_cider=round(self.log["val"]["cider"], 5),
+                val_rouge=round(self.log["val"]["rouge"], 5),
+                val_meteor=round(self.log["val"]["meteor"], 5),
+                val_loss=round(np.mean([v for v in self.log["val"]["loss"]]), 5),
+                val_ref_loss=round(np.mean([v for v in self.log["val"]["ref_loss"]]), 5),
+                val_lang_loss=round(np.mean([v for v in self.log["val"]["lang_loss"]]), 5),
+                val_objectness_loss=0,
+                val_vote_loss=0,
+                val_box_loss=0,
+                val_lang_acc=round(np.mean([v for v in self.log["val"]["lang_acc"]]), 5),
+                val_ref_acc=round(np.mean([v for v in self.log["val"]["ref_acc"]]), 5),
+                val_obj_acc=0,
+                val_pos_ratio=0,
+                val_neg_ratio=0,
+                val_iou_rate_25=round(np.mean([v for v in self.log["val"]["iou_rate_0.25"]]), 5),
+                val_iou_rate_5=round(np.mean([v for v in self.log["val"]["iou_rate_0.5"]]), 5),
+                val_max_iou_rate_25=round(np.mean([v for v in self.log["val"]["max_iou_rate_0.25"]]), 5),
+                val_max_iou_rate_5=round(np.mean([v for v in self.log["val"]["max_iou_rate_0.5"]]), 5),
+                scanrefer_plus_overall_25=self.log["val"]["scanrefer++_overall_25"],
+                scanrefer_plus_overall_50=self.log["val"]["scanrefer++_overall_50"],
+            )
         self._log(epoch_report)
         self._log_eval(epoch_report)
     
     def _best_report(self):
         self._log("training completed...")
-        best_report = self.__best_report_template.format(
-            epoch=self.best["epoch"],
-            bleu_1=round(self.best["bleu-1"], 5),
-            bleu_2=round(self.best["bleu-2"], 5),
-            bleu_3=round(self.best["bleu-3"], 5),
-            bleu_4=round(self.best["bleu-4"], 5),
-            cider=round(self.best["cider"], 5),
-            rouge=round(self.best["rouge"], 5),
-            meteor=round(self.best["meteor"], 5),
-            ref_acc=round(self.best["ref_acc"], 5),
-            obj_acc=round(self.best["obj_acc"], 5),
-            pos_ratio=round(self.best["pos_ratio"], 5),
-            neg_ratio=round(self.best["neg_ratio"], 5),
-            iou_rate_25=round(self.best["iou_rate_0.25"], 5),
-            iou_rate_5=round(self.best["iou_rate_0.5"], 5),
-            best_caption_epoch=self.best["best_caption_epoch"],
-            best_caption_bleu_4=round(self.best["best_caption_bleu-4"], 5),
-            best_caption_cider=round(self.best["best_caption_cider"], 5),
-            best_caption_rouge=round(self.best["best_caption_rouge"], 5),
-            best_caption_meteor=round(self.best["best_caption_meteor"], 5),
-            best_ground_epoch=self.best["best_ground_epoch"],
-            best_ground_iou_rate_25=round(self.best["best_ground_iou_rate_0.25"], 5),
-            best_ground_iou_rate_5=round(self.best["best_ground_iou_rate_0.5"], 5),
-        )
+        if not USE_GT:
+            best_report = self.__best_report_template.format(
+                epoch=self.best["epoch"],
+                bleu_1=round(self.best["bleu-1"], 5),
+                bleu_2=round(self.best["bleu-2"], 5),
+                bleu_3=round(self.best["bleu-3"], 5),
+                bleu_4=round(self.best["bleu-4"], 5),
+                cider=round(self.best["cider"], 5),
+                rouge=round(self.best["rouge"], 5),
+                meteor=round(self.best["meteor"], 5),
+                ref_acc=round(self.best["ref_acc"], 5),
+                obj_acc=round(self.best["obj_acc"], 5),
+                pos_ratio=round(self.best["pos_ratio"], 5),
+                neg_ratio=round(self.best["neg_ratio"], 5),
+                iou_rate_25=round(self.best["iou_rate_0.25"], 5),
+                iou_rate_5=round(self.best["iou_rate_0.5"], 5),
+                best_caption_epoch=self.best["best_caption_epoch"],
+                best_caption_bleu_4=round(self.best["best_caption_bleu-4"], 5),
+                best_caption_cider=round(self.best["best_caption_cider"], 5),
+                best_caption_rouge=round(self.best["best_caption_rouge"], 5),
+                best_caption_meteor=round(self.best["best_caption_meteor"], 5),
+                best_ground_epoch=self.best["best_ground_epoch"],
+                best_ground_iou_rate_25=round(self.best["best_ground_iou_rate_0.25"], 5),
+                best_ground_iou_rate_5=round(self.best["best_ground_iou_rate_0.5"], 5),
+            )
+        else:
+            best_report = self.__best_report_template.format(
+                epoch=self.best["epoch"],
+                bleu_1=round(self.best["bleu-1"], 5),
+                bleu_2=round(self.best["bleu-2"], 5),
+                bleu_3=round(self.best["bleu-3"], 5),
+                bleu_4=round(self.best["bleu-4"], 5),
+                cider=round(self.best["cider"], 5),
+                rouge=round(self.best["rouge"], 5),
+                meteor=round(self.best["meteor"], 5),
+                ref_acc=round(self.best["ref_acc"], 5),
+                obj_acc=0,
+                pos_ratio=0,
+                neg_ratio=0,
+                iou_rate_25=round(self.best["iou_rate_0.25"], 5),
+                iou_rate_5=round(self.best["iou_rate_0.5"], 5),
+                best_caption_epoch=self.best["best_caption_epoch"],
+                best_caption_bleu_4=round(self.best["best_caption_bleu-4"], 5),
+                best_caption_cider=round(self.best["best_caption_cider"], 5),
+                best_caption_rouge=round(self.best["best_caption_rouge"], 5),
+                best_caption_meteor=round(self.best["best_caption_meteor"], 5),
+                best_ground_epoch=self.best["best_ground_epoch"],
+                best_ground_iou_rate_25=round(self.best["best_ground_iou_rate_0.25"], 5),
+                best_ground_iou_rate_5=round(self.best["best_ground_iou_rate_0.5"], 5),
+            )
         self._log(best_report)
         with open(os.path.join(CONF.PATH.OUTPUT, self.stamp, "best.txt"), "w") as f:
             f.write(best_report)

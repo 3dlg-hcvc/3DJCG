@@ -1,10 +1,9 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from models.transformer.attention import MultiHeadAttention
-from models.transformer.utils import PositionWiseFeedForward
-import random
-
+from macro import *
+import numpy as np
+from utils.box_util import get_3d_box_batch
 
 class RelationModule(nn.Module):
     def __init__(self, num_proposals=256, hidden_size=128, lang_num_size=300, det_channel=128, head=4, depth=2):
@@ -55,7 +54,12 @@ class RelationModule(nn.Module):
             scores: (B,num_proposal,2+3+NH*2+NS*4)
         """
         # object size embedding
-        features = data_dict['pred_bbox_feature'].permute(0, 2, 1)
+        if not USE_GT:
+            features = data_dict['pred_bbox_feature'].permute(0, 2, 1)
+        else:
+            features = data_dict["proposal_features"]
+            data_dict['pred_bbox_corner'] = torch.from_numpy(get_3d_box_batch(data_dict["proposal_sizes"].detach().cpu().numpy(),
+                                            np.ones(shape=data_dict["proposal_centers"].shape[:2], dtype=np.int32), data_dict["proposal_centers"].detach().cpu().numpy())).float().to("cuda")
         # B, N = features.shape[:2]
         features = self.features_concat(features).permute(0, 2, 1)
         #features = features.permute(0, 2, 1)
