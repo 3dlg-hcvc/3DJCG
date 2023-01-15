@@ -8,19 +8,23 @@ from utils.box_util import get_3d_box_batch
 class RelationModule(nn.Module):
     def __init__(self, num_proposals=256, hidden_size=128, lang_num_size=300, det_channel=128, head=4, depth=2):
         super().__init__()
+
+
         self.use_box_embedding = True
         self.use_dist_weight_matrix = True
         self.use_obj_embedding = True
 
         self.num_proposals = num_proposals
+
         self.hidden_size = hidden_size
+
         self.depth = depth
 
         self.features_concat = nn.Sequential(
-            nn.Conv1d(det_channel, hidden_size, 1),
-            nn.BatchNorm1d(hidden_size),
-            nn.PReLU(hidden_size),
-            nn.Conv1d(hidden_size, hidden_size, 1),
+            nn.Conv1d(det_channel, self.hidden_size, 1),
+            nn.BatchNorm1d(self.hidden_size),
+            nn.PReLU(self.hidden_size),
+            nn.Conv1d(self.hidden_size, self.hidden_size, 1),
         )
         self.self_attn_fc = nn.ModuleList(
             nn.Sequential(  # 4 128 256 4(head)
@@ -32,11 +36,17 @@ class RelationModule(nn.Module):
             nn.LayerNorm(32),
             nn.Linear(32, 4)
         ) for i in range(depth))
-        self.self_attn = nn.ModuleList(
-            MultiHeadAttention(d_model=hidden_size, d_k=hidden_size // head, d_v=hidden_size // head, h=head) for i in range(depth))
 
-        self.bbox_embedding = nn.ModuleList(nn.Linear(27, hidden_size) for i in range(depth))
-        self.obj_embedding = nn.ModuleList(nn.Linear(128, hidden_size) for i in range(depth))
+        self.self_attn = nn.ModuleList(
+            MultiHeadAttention(d_model=self.hidden_size, d_k=self.hidden_size // head, d_v=self.hidden_size // head, h=head) for i in range(depth))
+
+
+
+        self.bbox_embedding = nn.ModuleList(nn.Linear(27, self.hidden_size) for i in range(depth))
+
+
+        self.obj_embedding = nn.ModuleList(nn.Linear(128, self.hidden_size) for i in range(depth))
+
 
 
     def _get_bbox_centers(self, corners):
@@ -54,16 +64,18 @@ class RelationModule(nn.Module):
             scores: (B,num_proposal,2+3+NH*2+NS*4)
         """
         # object size embedding
-        if not USE_GT:
-            features = data_dict['pred_bbox_feature'].permute(0, 2, 1)
-        else:
-            features = data_dict["proposal_features"]
-            data_dict['pred_bbox_corner'] = torch.from_numpy(get_3d_box_batch(data_dict["proposal_sizes"].detach().cpu().numpy(),
-                                            np.ones(shape=data_dict["proposal_centers"].shape[:2], dtype=np.int32), data_dict["proposal_centers"].detach().cpu().numpy())).float().to("cuda")
-        # B, N = features.shape[:2]
-        features = self.features_concat(features).permute(0, 2, 1)
-        #features = features.permute(0, 2, 1)
 
+        features = data_dict['pred_bbox_feature'].permute(0, 2, 1)
+        features = self.features_concat(features).permute(0, 2, 1)
+
+        if USE_GT:
+            pred_bboxes = get_3d_box_batch(data_dict["pred_size"].detach().cpu().numpy(),
+                                           data_dict['pred_heading'].detach().cpu().numpy(), data_dict["pred_center"].detach().cpu().numpy())
+            data_dict['pred_bbox_corner'] = torch.from_numpy(pred_bboxes).float().to("cuda")
+
+
+        # B, N = features.shape[:2]
+        #features = features.permute(0, 2, 1)
         batch_size, num_proposal = features.shape[:2]
         # features = self.mhatt(features, features, features, proposal_masks)
         for i in range(self.depth):
@@ -98,25 +110,30 @@ class RelationModule(nn.Module):
 
             # multiview/rgb feature embedding
             if self.use_obj_embedding:
-                obj_feat = data_dict["point_clouds"][..., 6:6 + 128].permute(0, 2, 1)
-                obj_feat_dim = obj_feat.shape[1]
-                obj_feat_id_seed = data_dict["seed_inds"]
-                obj_feat_id_seed = obj_feat_id_seed.long() + (
-                    (torch.arange(batch_size) * obj_feat.shape[1])[:, None].to(obj_feat_id_seed.device))
-                obj_feat_id_seed = obj_feat_id_seed.reshape(-1)
-                obj_feat_id_vote = data_dict["aggregated_vote_inds"]
-                obj_feat_id_vote = obj_feat_id_vote.long() + (
-                    (torch.arange(batch_size) * data_dict["seed_inds"].shape[1])[:, None].to(
-                        obj_feat_id_vote.device))
-                obj_feat_id_vote = obj_feat_id_vote.reshape(-1)
-                obj_feat_id = obj_feat_id_seed[obj_feat_id_vote]
-                obj_feat = obj_feat.reshape(-1, obj_feat_dim)[obj_feat_id].reshape(batch_size, num_proposal,
-                                                                                   obj_feat_dim)
+                if not USE_GT:
+                    obj_feat = data_dict["point_clouds"][..., 6:6 + 128].permute(0, 2, 1)
+
+                    obj_feat_dim = obj_feat.shape[1]
+                    obj_feat_id_seed = data_dict["seed_inds"]
+                    obj_feat_id_seed = obj_feat_id_seed.long() + (torch.arange(batch_size) * obj_feat.shape[1])[:, None].to("cuda")
+                    obj_feat_id_seed = obj_feat_id_seed.reshape(-1)
+                    obj_feat_id_vote = data_dict["aggregated_vote_inds"]
+                    obj_feat_id_vote = obj_feat_id_vote.long() + (
+                        (torch.arange(batch_size) * data_dict["seed_inds"].shape[1])[:, None].to(
+                            obj_feat_id_vote.device))
+                    obj_feat_id_vote = obj_feat_id_vote.reshape(-1)
+                    obj_feat_id = obj_feat_id_seed[obj_feat_id_vote]
+                    obj_feat = obj_feat.reshape(-1, obj_feat_dim)[obj_feat_id].reshape(batch_size, num_proposal, obj_feat_dim)
+                else:
+                    obj_feat = data_dict["obj_features"]
+
+
                 obj_embedding = self.obj_embedding[i](obj_feat)
                 features = features + obj_embedding * 0.1
 
             # box embedding
             if self.use_box_embedding:
+
                 corners = data_dict['pred_bbox_corner']
                 centers = self._get_bbox_centers(corners)  # batch_size, num_proposals, 3
                 num_proposals = centers.shape[1]

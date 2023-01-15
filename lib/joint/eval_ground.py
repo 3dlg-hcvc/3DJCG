@@ -59,25 +59,22 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
     """
 
     #batch_size, num_words, _ = data_dict["lang_feat"].shape
-    if not USE_GT:
-        objectness_preds_batch = torch.argmax(data_dict['objectness_scores'], 2).long()
-        objectness_labels_batch = data_dict['objectness_label'].long()
 
-        if post_processing:
-            _ = parse_predictions(data_dict, post_processing)
-            nms_masks = torch.LongTensor(data_dict['pred_mask']).cuda()
+    objectness_preds_batch = torch.argmax(data_dict['objectness_scores'], 2).long()
+    objectness_labels_batch = data_dict['objectness_label'].long()
 
-            # construct valid mask
-            pred_masks = (nms_masks * objectness_preds_batch == 1).float()
-            label_masks = (objectness_labels_batch == 1).float()
-        else:
-            # construct valid mask
-            pred_masks = (objectness_preds_batch == 1).float()
-            label_masks = (objectness_labels_batch == 1).float()
+    if post_processing:
+        _ = parse_predictions(data_dict, post_processing)
+        nms_masks = torch.LongTensor(data_dict['pred_mask']).cuda()
+
+        # construct valid mask
+        pred_masks = (nms_masks * objectness_preds_batch == 1).float()
+        label_masks = (objectness_labels_batch == 1).float()
     else:
-        # TODO
-        pred_masks = torch.ones(size=(data_dict["center_label"].shape[0], 256), dtype=torch.float32, device="cuda")
-        label_masks = torch.ones(size=(data_dict["center_label"].shape[0], 256), dtype=torch.float32, device="cuda")
+        # construct valid mask
+        pred_masks = (objectness_preds_batch == 1).float()
+        label_masks = (objectness_labels_batch == 1).float()
+
 
     #print("pred_masks", pred_masks.shape, label_masks.shape)
     batch_size, len_nun_max = data_dict["multi_ref_box_label_list"].shape[:2]

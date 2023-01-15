@@ -720,7 +720,6 @@ class ScannetReferenceDataset(ReferenceDataset):
         data_dict["object_cat"] = np.array(object_cat).astype(np.int64)
         data_dict["unique_multiple"] = np.array(self.unique_multiple_lookup[scene_id][str(object_id)][ann_id]).astype(np.int64)
         data_dict["pcl_color"] = pcl_color
-        data_dict["load_time"] = time.time() - start
 
         data_dict["lang_feat_list"] = np.array(lang_feat_list).astype(np.float32)  # language feature vectors
         data_dict["lang_len_list"] = np.array(lang_len_list).astype(np.int64)  # length of each description
@@ -819,7 +818,6 @@ class ScannetReferenceTestDataset():
         data_dict["point_clouds"] = point_cloud.astype(np.float32) # point cloud data including features
         data_dict["dataset_idx"] = idx
         data_dict["lang_feat"] = self.glove["sos"].astype(np.float32) # GloVE embedding for sos token
-        data_dict["load_time"] = time.time() - start
 
         return data_dict
 
@@ -1105,7 +1103,6 @@ class ScannetObjectDataset(ReferenceDataset):
         data_dict["lang_len"] = np.array(lang_len).astype(np.int64) # length of each description
         data_dict["lang_ids"] = np.array(self.lang_ids[scene_id][str(object_id)][ann_id]).astype(np.int64)
         data_dict["dataset_idx"] = np.array(idx).astype(np.int64)
-        data_dict["load_time"] = time.time() - start
 
         return data_dict
     

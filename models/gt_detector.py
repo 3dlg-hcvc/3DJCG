@@ -43,63 +43,68 @@ class GTDetector(nn.Module):
         assert batch_offsets[-1] == batch_idxs.shape[0]
         return batch_offsets
 
-
     def convert_stack_to_batch(self, data_dict):
         batch_size = len(data_dict["batch_offsets"]) - 1
-        max_num_proposal = 128
-        data_dict["proposal_features"] = torch.zeros(batch_size, max_num_proposal, self.m, device="cuda")
-        data_dict["proposal_centers"] = torch.zeros(batch_size, max_num_proposal, 3, device="cuda")
-        data_dict["proposal_sizes"] = torch.zeros(batch_size, max_num_proposal, 3, device="cuda")
+        max_num_proposal = 256
+        data_dict["pred_bbox_feature"] = torch.zeros(size=(batch_size, max_num_proposal, self.m), device="cuda",
+                                                 dtype=torch.float32)
+        data_dict["objectness_scores"] = torch.zeros(size=(batch_size, max_num_proposal, 1), device="cuda", dtype=bool)
+        data_dict["obj_features"] = torch.zeros(size=(batch_size, max_num_proposal, 128), device="cuda", dtype=torch.float32)
 
-
+        # proposal_bbox = data_dict["proposal_crop_bbox"].detach().cpu().numpy()
+        # proposal_bbox = get_3d_box_batch(proposal_bbox[:, :3], proposal_bbox[:, 3:6],
+        #                                  proposal_bbox[:, 6])  # (nProposals, 8, 3)
+        # proposal_bbox_tensor = torch.tensor(proposal_bbox).type_as(data_dict["proposal_feats"])
+        #
         for b in range(batch_size):
-
             proposal_batch_idx = torch.nonzero(data_dict["proposals_batchId"] == b).squeeze(-1)
             pred_num = len(proposal_batch_idx)
-            data_dict["proposal_features"][b, :pred_num, :] = data_dict["proposal_feats"][proposal_batch_idx][:pred_num]
-            data_dict["proposal_centers"][b, :pred_num, :] = data_dict["proposal_crop_bbox"][proposal_batch_idx, :3][:pred_num]
-            data_dict["proposal_sizes"][b, :pred_num, :] = data_dict["proposal_crop_bbox"][proposal_batch_idx, 3:6][
-                                                             :pred_num]
-        del data_dict["proposal_crop_bbox"]
+            data_dict["pred_bbox_feature"][b, :pred_num, :] = data_dict["proposal_feats"][proposal_batch_idx][:pred_num]
+            data_dict["objectness_scores"][b, :pred_num, 0] = data_dict["proposal_objectness_scores"][
+                                                                  proposal_batch_idx][:pred_num]
+            data_dict["obj_features"][b, :pred_num, :] = data_dict["tmp_obj_features"][proposal_batch_idx][:pred_num]
+
+        data_dict["pred_center"] = data_dict['center_label']
+        data_dict['pred_heading'] = data_dict['heading_class_label']
+        data_dict['heading_residuals'] = data_dict['heading_residual_label']
+        data_dict['size_scores'] = data_dict['size_class_label']
+        data_dict['size_residuals'] = data_dict['size_residual_label']
+        data_dict['objectness_label'] = data_dict["objectness_scores"]
         return data_dict
 
 
     def forward(self, data_dict):
-        batch_size = len(data_dict["batch_offsets"]) - 1
         x = ME.SparseTensor(features=data_dict["voxel_feats"], coordinates=data_dict["voxel_locs"].int())
 
         #### backbone
         out = self.backbone(x)
         pt_feats = out.features[data_dict["p2v_map"].long()]  # (N, m)
 
-        num_proposals = len(data_dict["instances_bboxes_tmp"])# TODO  convert to batch
+        num_proposals = len(data_dict["gt_proposals_offset"]) - 1  # TODO  convert to batch
         gt_proposal_features = torch.empty(size=(num_proposals, pt_feats.shape[1]), device="cuda")
+
+        gt_obj_features = torch.empty(size=(num_proposals, 128), device="cuda")
 
         batch_idxs = data_dict["locs_scaled"][:, 0].int()
         proposals_batchId_all = batch_idxs[data_dict["gt_proposals_idx"][:, 1].long()].int()
 
         proposals_batchId = proposals_batchId_all[data_dict["gt_proposals_offset"][:-1].long()]
-        sem_labels = torch.empty(size=(num_proposals, ), device="cuda")
+        sem_labels = torch.empty(size=(num_proposals,), device="cuda")
 
         for idx in range(num_proposals):
             start_idx = data_dict["gt_proposals_offset"][idx]
-            end_idx = data_dict["gt_proposals_offset"][idx+1]
+            end_idx = data_dict["gt_proposals_offset"][idx + 1]
             proposal_info = data_dict["gt_proposals_idx"][start_idx:end_idx]
             proposal_point_mask = proposal_info[:, 1].long()
-            proposal_features = torch.mean(pt_feats[proposal_point_mask], dim=0)
-            gt_proposal_features[idx] = proposal_features
+
+            gt_proposal_features[idx] = torch.mean(pt_feats[proposal_point_mask], dim=0)
+            gt_obj_features[idx] = torch.mean(data_dict["feats"][:, 3:131][proposal_point_mask], dim=0)
             sem_labels[idx] = 0
 
         data_dict["proposals_batchId"] = proposals_batchId
         data_dict["proposal_feats"] = gt_proposal_features
-        data_dict["proposal_objectness_scores"] = torch.ones(size=(num_proposals,), dtype=torch.int32, device="cuda")
-
-        proposal_crop_bbox = torch.zeros(num_proposals, 9, device="cuda")  # (nProposals, center+size+heading+label)
-        proposal_crop_bbox[:, :3] = data_dict["instances_bboxes_tmp"][:, :3]
-        proposal_crop_bbox[:, 3:6] = data_dict["instances_bboxes_tmp"][:, 3:6]
-        proposal_crop_bbox[:, 7] = sem_labels
-        proposal_crop_bbox[:, 8] = torch.ones(size=(num_proposals,), dtype=torch.int32, device="cuda")
-        data_dict["proposal_crop_bbox"] = proposal_crop_bbox
+        data_dict["proposal_objectness_scores"] = torch.ones(size=(num_proposals,), dtype=bool, device="cuda")
+        data_dict["tmp_obj_features"] = gt_obj_features
         return data_dict
 
 

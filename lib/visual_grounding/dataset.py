@@ -351,7 +351,6 @@ class ScannetReferenceDataset(Dataset):
         data_dict["scan_idx"] = np.array(idx).astype(np.int64)
         data_dict["pcl_color"] = pcl_color
 
-        data_dict["load_time"] = time.time() - start
 
         data_dict["lang_num"] = np.array(lang_num).astype(np.int64)
         data_dict["lang_feat_list"] = np.array(lang_feat_list).astype(np.float32)  # language feature vectors

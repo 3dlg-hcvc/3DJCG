@@ -41,13 +41,15 @@ class JointNet(nn.Module):
 
             # Hough voting
             self.vgen = VotingModule(self.vote_factor, 256)
+            self.proposal = ProposalModule(num_class, num_heading_bin, num_size_cluster, mean_size_arr, num_proposal,
+                                           sampling)
+            self.relation = RelationModule(num_proposals=num_proposal, det_channel=128)  # bef 256
         else:
             self.backbone_net = GTDetector()
+            self.relation = RelationModule(num_proposals=num_proposal, det_channel=16)
 
         # Vote aggregation and object proposal
-        self.proposal = ProposalModule(num_class, num_heading_bin, num_size_cluster, mean_size_arr, num_proposal, sampling)
 
-        self.relation = RelationModule(num_proposals=num_proposal, det_channel=128)  # bef 256
         if not no_reference:
             # --------- LANGUAGE ENCODING ---------
             # Encode the input descriptions into vectors
@@ -111,6 +113,7 @@ class JointNet(nn.Module):
 
             # --------- PROPOSAL GENERATION ---------
             data_dict = self.proposal(xyz, features, data_dict)
+
         else:
             data_dict = self.backbone_net.feed(data_dict)
             #data_dict["seed_inds"] =

@@ -446,7 +446,7 @@ class Solver():
                 }
 
                 # load
-                self.log[phase]["fetch"].append(data_dict["load_time"].sum().item())
+                self.log[phase]["fetch"].append(0)
 
                 # forward
                 start = time.time()

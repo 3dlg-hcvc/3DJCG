@@ -63,7 +63,7 @@ def compute_reference_loss(data_dict, config, no_reference=False):
 
 
     # convert gt bbox parameters to bbox corners
-    batch_size, num_proposals = data_dict['aggregated_vote_features'].shape[:2]
+    batch_size, num_proposals = data_dict['pred_center'].shape[:2]
     batch_size, len_nun_max = data_dict["multi_ref_box_label_list"].shape[:2]
     lang_num = data_dict["lang_num"]
     max_iou_rate_25 = 0

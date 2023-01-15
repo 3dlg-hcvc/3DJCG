@@ -58,7 +58,6 @@ def _collate_fn(batch):
     locs_scaled = []
     gt_proposals_idx = []
     gt_proposals_offset = []
-    instances_bboxes_tmp = []
     me_feats = []
     batch_offsets = [0]
     total_num_inst = 0
@@ -80,7 +79,6 @@ def _collate_fn(batch):
             gt_proposals_idx_i[:, 0] += total_num_inst
             gt_proposals_idx_i[:, 1] += total_points
             gt_proposals_idx.append(torch.from_numpy(b["gt_proposals_idx"]))
-            instances_bboxes_tmp.append(torch.from_numpy(b["instances_bboxes_tmp"]))
             if gt_proposals_offset != []:
                 gt_proposals_offset_i = b["gt_proposals_offset"]
                 gt_proposals_offset_i += gt_proposals_offset[-1][-1].item()
@@ -90,7 +88,7 @@ def _collate_fn(batch):
 
         instance_ids_i = b["instance_ids"]
         instance_ids_i[np.where(instance_ids_i != 0)] += total_num_inst
-        total_num_inst += b["instances_bboxes_tmp"].shape[0]
+        total_num_inst += b["gt_proposals_offset"].shape[0] - 1
         total_points += len(instance_ids_i)
         instance_ids.append(torch.from_numpy(instance_ids_i))
 
@@ -101,14 +99,12 @@ def _collate_fn(batch):
         b.pop("locs_scaled", None)
         b.pop("gt_proposals_idx", None)
         b.pop("gt_proposals_offset", None)
-        b.pop("instances_bboxes_tmp", None)
 
     data_dict = default_collate(batch)
     data_dict["locs_scaled"] = torch.cat(locs_scaled, 0)
     data_dict["batch_offsets"] = torch.tensor(batch_offsets, dtype=torch.int)
     data_dict["gt_proposals_idx"] = torch.cat(gt_proposals_idx, 0)
     data_dict["gt_proposals_offset"] = torch.cat(gt_proposals_offset, 0)
-    data_dict["instances_bboxes_tmp"] = torch.cat(instances_bboxes_tmp, 0)
     data_dict["voxel_locs"], data_dict["p2v_map"], data_dict["v2p_map"] = pointgroup_ops.voxelization_idx(data_dict["locs_scaled"], len(batch), 4)
 
     data_dict["feats"] = torch.cat(me_feats, 0)

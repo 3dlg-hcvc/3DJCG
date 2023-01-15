@@ -24,7 +24,7 @@ from macro import *
 
 # data setting
 DC = ScannetDatasetConfig()
-MAX_NUM_OBJ = 128
+MAX_NUM_OBJ = 256
 MEAN_COLOR_RGB = np.array([109.8, 97.2, 83.8])
 OBJ_CLASS_IDS = np.array([3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40]) # exclude wall (1), floor (2), ceiling (22)
 
@@ -67,37 +67,24 @@ class ReferenceDataset(Dataset):
                 raw2label[raw_name] = scannet2label[nyu40_name]
 
         return raw2label
-    def _generate_gt_clusters(self, points, instance_ids, sem_labels):
+    def _generate_gt_clusters(self, instance_ids, sem_labels):
         gt_proposals_idx = []
         gt_proposals_offset = [0]
         filtered_instance_ids = instance_ids[(sem_labels != 1) & (sem_labels != 2) & (sem_labels != 22)]
         unique_instance_ids = np.unique(filtered_instance_ids)
-        num_instance = len(unique_instance_ids) - 1 if 0 in unique_instance_ids else len(unique_instance_ids)
-        instance_bboxes = np.zeros((num_instance, 6))
         object_ids = []
-
         for cid, i_ in enumerate(unique_instance_ids, -1):
             if i_ <= 0:
                 continue
             object_ids.append(i_)
             inst_i_idx = np.where(instance_ids == i_)[0]
 
-            inst_i_points = points[inst_i_idx]
-            xmin = np.min(inst_i_points[:, 0])
-            ymin = np.min(inst_i_points[:, 1])
-            zmin = np.min(inst_i_points[:, 2])
-            xmax = np.max(inst_i_points[:, 0])
-            ymax = np.max(inst_i_points[:, 1])
-            zmax = np.max(inst_i_points[:, 2])
-            bbox = np.array(
-                [(xmin + xmax) / 2, (ymin + ymax) / 2, (zmin + zmax) / 2, xmax - xmin, ymax - ymin, zmax - zmin])
-            instance_bboxes[cid, :] = bbox
             proposals_idx_i = np.vstack((np.ones(len(inst_i_idx)) * cid, inst_i_idx)).transpose().astype(np.int32)
             gt_proposals_idx.append(proposals_idx_i)
             gt_proposals_offset.append(len(inst_i_idx) + gt_proposals_offset[-1])
         gt_proposals_idx = np.concatenate(gt_proposals_idx, axis=0)
         gt_proposals_offset = np.array(gt_proposals_offset).astype(np.int32)
-        return gt_proposals_idx, gt_proposals_offset, object_ids, instance_bboxes
+        return gt_proposals_idx, gt_proposals_offset, object_ids
     def _get_unique_multiple_lookup(self):
         all_sem_labels = {}
         cache = {}
@@ -505,7 +492,6 @@ class ScannetReferenceDataset(ReferenceDataset):
                 scanrefer_train_new_scene.append(new_data)
             if len(scanrefer_train_new_scene) > 0:
                 scanrefer_train_new.append(scanrefer_train_new_scene)
-                scanrefer_train_new_scene = []
         return scanrefer_train_new
 
     def shuffle_data(self):
@@ -643,6 +629,7 @@ class ScannetReferenceDataset(ReferenceDataset):
         angle_residuals = np.zeros((MAX_NUM_OBJ,))
         size_classes = np.zeros((MAX_NUM_OBJ,))
         size_residuals = np.zeros((MAX_NUM_OBJ, 3))
+        box_size = np.zeros((MAX_NUM_OBJ, 3))
 
         ref_box_label_list = []
         ref_center_label_list = []
@@ -735,6 +722,7 @@ class ScannetReferenceDataset(ReferenceDataset):
         # NOTE: set size class as semantic class. Consider use size2class.
         size_classes[0:num_bbox] = class_ind
         size_residuals[0:num_bbox, :] = target_bboxes[0:num_bbox, 3:6] - DC.mean_size_arr[class_ind,:]
+        box_size[0:num_bbox, :] = target_bboxes[0:num_bbox, 3:6]
 
         # construct the reference target label for each bbox
         for j in range(self.lang_num_max):
@@ -842,10 +830,9 @@ class ScannetReferenceDataset(ReferenceDataset):
             scaled_points = point_cloud[:, :3] * scale
             scaled_points -= scaled_points.min(0)
             data_dict["locs_scaled"] = scaled_points.astype(np.float32)
-            gt_proposals_idx, gt_proposals_offset, _, instances_bboxes_tmp = self._generate_gt_clusters(point_cloud[:, :3], instance_labels, semantic_labels)
+            gt_proposals_idx, gt_proposals_offset, _ = self._generate_gt_clusters(instance_labels, semantic_labels)
             data_dict["gt_proposals_idx"] = gt_proposals_idx
             data_dict["gt_proposals_offset"] = gt_proposals_offset
-            data_dict["instances_bboxes_tmp"] = instances_bboxes_tmp
         data_dict["unk"] = unk.astype(np.float32)
         data_dict["istrain"] = istrain
         data_dict["scene_id"] = scene_id
@@ -860,6 +847,7 @@ class ScannetReferenceDataset(ReferenceDataset):
         data_dict["heading_residual_label"] = angle_residuals.astype(np.float32) # (MAX_NUM_OBJ,)
         data_dict["size_class_label"] = size_classes.astype(np.int64) # (MAX_NUM_OBJ,) with int values in 0,...,NUM_SIZE_CLUSTER
         data_dict["size_residual_label"] = size_residuals.astype(np.float32) # (MAX_NUM_OBJ, 3)
+        data_dict["pred_size"] = box_size.astype(np.float32)
         data_dict["num_bbox"] = np.array(num_bbox).astype(np.int64)
         data_dict["sem_cls_label"] = target_bboxes_semcls.astype(np.int64) # (MAX_NUM_OBJ,) semantic class index
 
@@ -888,7 +876,6 @@ class ScannetReferenceDataset(ReferenceDataset):
         data_dict["object_cat"] = np.array(object_cat).astype(np.int64)
         data_dict["unique_multiple"] = np.array(self.unique_multiple_lookup[scene_id][str(object_id)][ann_id]).astype(np.int64)
         data_dict["pcl_color"] = pcl_color
-        data_dict["load_time"] = time.time() - start
 
         data_dict["lang_feat_list"] = np.array(lang_feat_list).astype(np.float32)  # language feature vectors
         data_dict["lang_len_list"] = np.array(lang_len_list).astype(np.int64)  # length of each description
@@ -995,7 +982,6 @@ class ScannetReferenceTestDataset():
         data_dict["point_clouds"] = point_cloud.astype(np.float32) # point cloud data including features
         data_dict["dataset_idx"] = idx
         data_dict["lang_feat"] = self.glove["sos"].astype(np.float32) # GloVE embedding for sos token
-        data_dict["load_time"] = time.time() - start
 
         return data_dict
 
@@ -1281,7 +1267,6 @@ class ScannetObjectDataset(ReferenceDataset):
         data_dict["lang_len"] = np.array(lang_len).astype(np.int64) # length of each description
         data_dict["lang_ids"] = np.array(self.lang_ids[scene_id][str(object_id)][ann_id]).astype(np.int64)
         data_dict["dataset_idx"] = np.array(idx).astype(np.int64)
-        data_dict["load_time"] = time.time() - start
 
         return data_dict
     

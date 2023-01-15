@@ -1,8 +1,5 @@
 import torch
 import torch.nn as nn
-import numpy as np
-import sys
-import os
 
 from models.base_module.backbone_module import Pointnet2Backbone
 from models.base_module.voting_module import VotingModule
@@ -11,7 +8,7 @@ from models.base_module.lang_module import LangModule
 from models.proposal_module.proposal_module_fcos import ProposalModule
 from models.proposal_module.relation_module import RelationModule
 from .match_module import MatchModule
-
+from macro import *
 
 class RefNet(nn.Module):
     def __init__(self, num_class, num_heading_bin, num_size_cluster, mean_size_arr,
@@ -52,7 +49,9 @@ class RefNet(nn.Module):
 
             # --------- PROPOSAL MATCHING ---------
             # Match the generated proposals and select the most confident ones
+
             self.relation = RelationModule(num_proposals=num_proposal, det_channel=128)  # bef 256
+
             self.match = MatchModule(num_proposals=num_proposal, lang_size=(1 + int(self.use_bidir)) * hidden_size, det_channel=128)  # bef 256
 
     def forward(self, data_dict):
