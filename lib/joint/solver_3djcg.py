@@ -471,6 +471,13 @@ class Solver():
             self._running_log["obj_acc"] = data_dict["obj_acc"].item()
             self._running_log["pos_ratio"] = data_dict["pos_ratio"].item()
             self._running_log["neg_ratio"] = data_dict["neg_ratio"].item()
+        else:
+            self._running_log["objectness_loss"] = 0
+            self._running_log["vote_loss"] = 0
+            self._running_log["box_loss"] = 0
+            self._running_log["obj_acc"] = 0
+            self._running_log["pos_ratio"] = 0
+            self._running_log["neg_ratio"] = 0
 
         self._running_log["loss"] = data_dict["loss"]
 
@@ -782,6 +789,13 @@ class Solver():
                             self.log[phase]["obj_acc"].append(self._running_log["obj_acc"])
                             self.log[phase]["pos_ratio"].append(self._running_log["pos_ratio"])
                             self.log[phase]["neg_ratio"].append(self._running_log["neg_ratio"])
+                        else:
+                            self.log[phase]["objectness_loss"].append(0)
+                            self.log[phase]["vote_loss"].append(0)
+                            self.log[phase]["box_loss"].append(0)
+                            self.log[phase]["obj_acc"].append(0)
+                            self.log[phase]["pos_ratio"].append(0)
+                            self.log[phase]["neg_ratio"].append(0)
 
                         self.log[phase]["lang_acc"].append(self._running_log["lang_acc"])
                         self.log[phase]["ref_acc"].append(self._running_log["ref_acc"])
