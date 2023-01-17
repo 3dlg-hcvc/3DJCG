@@ -77,7 +77,7 @@ def get_scannet_scene_list(split):
 
 def get_scanrefer(args):
     if args.detection:
-        scene_list = get_scannet_scene_list("val")
+        scene_list = get_scannet_scene_list(args.split)
         scanrefer = []
         for scene_id in scene_list:
             data = deepcopy(SCANREFER_TRAIN[0])
@@ -124,7 +124,7 @@ def eval_ref(args):
 
     # dataloader
     #_, dataloader = get_dataloader(args, scanrefer, scene_list, "val", DC)
-    _, dataloader = get_dataloader(args, scanrefer, scanrefer_val_new, scene_list, "val", DC)
+    _, dataloader = get_dataloader(args, scanrefer, scanrefer_val_new, scene_list, args.split, DC)
 
     # model
     model = get_model(args, DC)
@@ -395,7 +395,7 @@ def eval_det(args):
     scanrefer, scene_list = get_scanrefer(args)
 
     # dataloader
-    _, dataloader = get_dataloader(args, scanrefer, scene_list, "val", DC)
+    _, dataloader = get_dataloader(args, scanrefer, scene_list, args.split, DC)
 
     # model
     model = get_model(args, DC)
@@ -476,6 +476,7 @@ if __name__ == "__main__":
     parser.add_argument("--use_best", action="store_true", help="Use best bounding boxes as outputs.")
     parser.add_argument("--reference", action="store_true", help="evaluate the reference localization results")
     parser.add_argument("--detection", action="store_true", help="evaluate the object detection results")
+    parser.add_argument("--split", default="val")
     args = parser.parse_args()
 
     assert args.lang_num_max == 1, 'lang max num == 1; avoid bugs'

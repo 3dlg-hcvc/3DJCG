@@ -282,11 +282,12 @@ class Solver():
                 self.bn_scheduler.step()
 
             if epoch_id % 10 == 0 and epoch_id != 0:
-                torch.cuda.empty_cache()
-                self._feed(self.dataloader["eval"]["val"], "val", epoch_id, is_eval=True)
-                self._dump_log("val", True)
-                self._epoch_report(epoch_id)
-                self._finish(epoch_id)
+                with torch.no_grad():
+                    torch.cuda.empty_cache()
+                    self._feed(self.dataloader["eval"]["val"], "val", epoch_id, is_eval=True)
+                    self._dump_log("val", True)
+                    self._epoch_report(epoch_id)
+                    self._finish(epoch_id)
                 
 
 
