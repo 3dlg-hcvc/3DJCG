@@ -27,7 +27,7 @@ from macro import *
 print('Import Done', flush=True)
 SCANREFER_TRAIN = json.load(open(os.path.join(CONF.PATH.DATA, "ScanRefer_filtered_train.json")))
 SCANREFER_VAL = json.load(open(os.path.join(CONF.PATH.DATA, "ScanRefer_filtered_val.json")))
-# SCANREFER_VAL = json.load(open(os.path.join(CONF.PATH.DATA, "ScanRefer_filtered_test.json")))
+SCANREFER_TEST = json.load(open(os.path.join(CONF.PATH.DATA, "ScanRefer_filtered_test.json")))
 
 
 def get_dataloader(args, scanrefer, scanrefer_new, all_scene_list, split, config):
@@ -153,6 +153,8 @@ def get_scanrefer(args):
             scanrefer.append(data)
     else:
         scanrefer = SCANREFER_TRAIN if args.use_train else SCANREFER_VAL
+        if args.split == "test" and not args.use_train:
+            scanrefer = SCANREFER_TEST
         scene_list = sorted(list(set([data["scene_id"] for data in scanrefer])))
         if args.num_scenes != -1:
             scene_list = scene_list[:args.num_scenes]
@@ -179,16 +181,16 @@ def get_scanrefer(args):
         if len(scanrefer_val_new_scene) > 0:
             scanrefer_val_new.append(scanrefer_val_new_scene)
 
-        new_scanrefer_eval_val2 = []
-        scanrefer_eval_val_new2 = []
-        for scene_id in scene_list:
-            data = deepcopy(SCANREFER_VAL[0])
-            data["scene_id"] = scene_id
-            new_scanrefer_eval_val2.append(data)
-            scanrefer_eval_val_new_scene2 = []
-            for i in range(args.lang_num_max):
-                scanrefer_eval_val_new_scene2.append(data)
-            scanrefer_eval_val_new2.append(scanrefer_eval_val_new_scene2)
+        # new_scanrefer_eval_val2 = []
+        # scanrefer_eval_val_new2 = []
+        # for scene_id in scene_list:
+        #     data = deepcopy(SCANREFER_VAL[0])
+        #     data["scene_id"] = scene_id
+        #     new_scanrefer_eval_val2.append(data)
+        #     scanrefer_eval_val_new_scene2 = []
+        #     for i in range(args.lang_num_max):
+        #         scanrefer_eval_val_new_scene2.append(data)
+        #     scanrefer_eval_val_new2.append(scanrefer_eval_val_new_scene2)
 
     return scanrefer, scene_list, scanrefer_val_new
 

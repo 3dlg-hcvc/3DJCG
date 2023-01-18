@@ -48,7 +48,10 @@ class GTDetector(nn.Module):
         max_num_proposal = 256
         data_dict["pred_bbox_feature"] = torch.zeros(size=(batch_size, max_num_proposal, self.m), device="cuda",
                                                  dtype=torch.float32)
-        data_dict["objectness_scores"] = torch.zeros(size=(batch_size, max_num_proposal, 1), device="cuda", dtype=bool)
+        data_dict["objectness_scores"] = torch.zeros(size=(batch_size, max_num_proposal, 2), device="cuda",
+                                                     dtype=torch.int32)
+        data_dict['objectness_label'] = torch.zeros(size=(batch_size, max_num_proposal), device="cuda",
+                                                    dtype=torch.int32)
         data_dict["obj_features"] = torch.zeros(size=(batch_size, max_num_proposal, 128), device="cuda", dtype=torch.float32)
 
         # proposal_bbox = data_dict["proposal_crop_bbox"].detach().cpu().numpy()
@@ -60,8 +63,10 @@ class GTDetector(nn.Module):
             proposal_batch_idx = torch.nonzero(data_dict["proposals_batchId"] == b).squeeze(-1)
             pred_num = len(proposal_batch_idx)
             data_dict["pred_bbox_feature"][b, :pred_num, :] = data_dict["proposal_feats"][proposal_batch_idx][:pred_num]
-            data_dict["objectness_scores"][b, :pred_num, 0] = data_dict["proposal_objectness_scores"][
-                                                                  proposal_batch_idx][:pred_num]
+            data_dict["objectness_scores"][b, :pred_num, 1] = data_dict["proposal_objectness_scores"][
+                                                                  proposal_batch_idx][:pred_num].int()
+            data_dict['objectness_label'][b, :pred_num] = data_dict["proposal_objectness_scores"][proposal_batch_idx][
+                                                          :pred_num].int()
             data_dict["obj_features"][b, :pred_num, :] = data_dict["tmp_obj_features"][proposal_batch_idx][:pred_num]
 
         data_dict["pred_center"] = data_dict['center_label']
@@ -69,7 +74,6 @@ class GTDetector(nn.Module):
         data_dict['heading_residuals'] = data_dict['heading_residual_label']
         data_dict['size_scores'] = data_dict['size_class_label']
         data_dict['size_residuals'] = data_dict['size_residual_label']
-        data_dict['objectness_label'] = data_dict["objectness_scores"]
         return data_dict
 
 
