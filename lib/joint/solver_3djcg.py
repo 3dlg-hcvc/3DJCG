@@ -1022,13 +1022,13 @@ class Solver():
         self._log_eval("epoch [{}/{}] done...".format(epoch_id + 1, self.epoch))
         if not USE_GT:
             epoch_report = self.__epoch_report_template.format(
-                train_bleu_1=round(self.log["train"]["bleu-1"], 5),
-                train_bleu_2=round(self.log["train"]["bleu-2"], 5),
-                train_bleu_3=round(self.log["train"]["bleu-3"], 5),
-                train_bleu_4=round(self.log["train"]["bleu-4"], 5),
-                train_cider=round(self.log["train"]["cider"], 5),
-                train_rouge=round(self.log["train"]["rouge"], 5),
-                train_meteor=round(self.log["train"]["meteor"], 5),
+                train_bleu_1=0,
+                train_bleu_2=0,
+                train_bleu_3=0,
+                train_bleu_4=0,
+                train_cider=0,
+                train_rouge=0,
+                train_meteor=0,
                 train_loss=round(np.mean([v for v in self.log["train"]["loss"]]), 5),
                 train_ref_loss=round(np.mean([v for v in self.log["train"]["ref_loss"]]), 5),
                 train_lang_loss=round(np.mean([v for v in self.log["train"]["lang_loss"]]), 5),
@@ -1071,13 +1071,13 @@ class Solver():
             )
         else:
             epoch_report = self.__epoch_report_template.format(
-                train_bleu_1=round(self.log["train"]["bleu-1"], 5),
-                train_bleu_2=round(self.log["train"]["bleu-2"], 5),
-                train_bleu_3=round(self.log["train"]["bleu-3"], 5),
-                train_bleu_4=round(self.log["train"]["bleu-4"], 5),
-                train_cider=round(self.log["train"]["cider"], 5),
-                train_rouge=round(self.log["train"]["rouge"], 5),
-                train_meteor=round(self.log["train"]["meteor"], 5),
+                train_bleu_1=0,
+                train_bleu_2=0,
+                train_bleu_3=0,
+                train_bleu_4=0,
+                train_cider=0,
+                train_rouge=0,
+                train_meteor=0,
                 train_loss=round(np.mean([v for v in self.log["train"]["loss"]]), 5),
                 train_ref_loss=round(np.mean([v for v in self.log["train"]["ref_loss"]]), 5),
                 train_lang_loss=round(np.mean([v for v in self.log["train"]["lang_loss"]]), 5),
