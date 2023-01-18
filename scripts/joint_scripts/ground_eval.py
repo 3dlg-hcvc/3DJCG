@@ -592,9 +592,15 @@ if __name__ == "__main__":
     parser.add_argument("--reference", action="store_true", help="evaluate the reference localization results")
     parser.add_argument("--detection", action="store_true", help="evaluate the object detection results")
     parser.add_argument("--split", default="val")
+    parser.add_argument("--vanilla", action="store_true", default=False)
+    parser.add_argument("--loss", default=0.5)
+    parser.add_argument("--eval", default=0.1)
     args = parser.parse_args()
 
     assert args.lang_num_max == 1, 'lang max num == 1; avoid bugs'
+    SCANREFER_ENHANCE_VANILLE = args.vanilla
+    SCANREFER_ENHANCE_LOSS_THRESHOLD = args.loss
+    SCANREFER_ENHANCE_EVAL_THRESHOLD = args.eval
     # setting
     # os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     # os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
