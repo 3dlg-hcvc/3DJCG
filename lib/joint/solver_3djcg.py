@@ -12,7 +12,7 @@ import numpy as np
 from tqdm import tqdm
 from tensorboardX import SummaryWriter
 from torch.optim.lr_scheduler import StepLR, MultiStepLR, CosineAnnealingLR
-
+import shutil
 from lib.configs.config_joint import CONF
 from lib.loss_helper.loss_joint import get_joint_loss
 from lib.joint.eval_caption import eval_cap
@@ -821,6 +821,7 @@ class Solver():
                     iou_25_results, iou_50_results = evaluate_all_scenes(all_preds, all_gts)
                     self.log[phase]["scanrefer++_overall_25"] = iou_25_results["overall"]
                     self.log[phase]["scanrefer++_overall_50"] = iou_50_results["overall"]
+                    shutil.rmtree(dir_name)
 
             cur_criterion = self.criterion
             if phase == "val" and cur_criterion == "sum":
