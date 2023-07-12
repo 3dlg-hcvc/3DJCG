@@ -549,21 +549,21 @@ class ScannetReferenceDataset(ReferenceDataset):
                 object_name = " ".join(self.scanrefer_new[idx][i]["object_name"].split("_"))
                 ann_id = self.scanrefer_new[idx][i]["ann_id"]
 
-                lang_feat = self.lang[scene_id][str(object_id)][ann_id]
+                lang_feat = self.lang[scene_id][int(object_id)][ann_id]
                 lang_len = len(self.scanrefer_new[idx][i]["token"]) + 2
                 lang_len = lang_len if lang_len <= CONF.TRAIN.MAX_DES_LEN + 2 else CONF.TRAIN.MAX_DES_LEN + 2
-                lang_ids = self.lang_ids[scene_id][str(object_id)][ann_id]
-                main_lang_feat = self.lang_main[scene_id][str(object_id)][ann_id]["main"]
-                main_lang_len = self.lang_main[scene_id][str(object_id)][ann_id]["len"]
-                first_obj = self.lang_main[scene_id][str(object_id)][ann_id]["first_obj"]
-                unk = self.lang_main[scene_id][str(object_id)][ann_id]["unk"]
+                lang_ids = self.lang_ids[scene_id][int(object_id)][ann_id]
+                main_lang_feat = self.lang_main[scene_id][int(object_id)][ann_id]["main"]
+                main_lang_len = self.lang_main[scene_id][int(object_id)][ann_id]["len"]
+                first_obj = self.lang_main[scene_id][int(object_id)][ann_id]["first_obj"]
+                unk = self.lang_main[scene_id][int(object_id)][ann_id]["unk"]
 
-                ground_lang_feat = self.ground_lang[scene_id][str(object_id)][ann_id]
+                ground_lang_feat = self.ground_lang[scene_id][int(object_id)][ann_id]
                 ground_lang_len = len(self.scanrefer_new[idx][i]["token"])
                 ground_lang_len = ground_lang_len if ground_lang_len <= CONF.TRAIN.MAX_GROUND_DES_LEN else CONF.TRAIN.MAX_GROUND_DES_LEN
-                ground_main_lang_feat = self.ground_lang_main[scene_id][str(object_id)][ann_id]["main"]
-                ground_main_lang_len = self.ground_lang_main[scene_id][str(object_id)][ann_id]["len"]
-                ground_first_obj = self.ground_lang_main[scene_id][str(object_id)][ann_id]["first_obj"]
+                ground_main_lang_feat = self.ground_lang_main[scene_id][int(object_id)][ann_id]["main"]
+                ground_main_lang_len = self.ground_lang_main[scene_id][int(object_id)][ann_id]["len"]
+                ground_first_obj = self.ground_lang_main[scene_id][int(object_id)][ann_id]["first_obj"]
 
             object_id_list.append(object_id)
             if SCANREFER_ENHANCE:
@@ -840,7 +840,7 @@ class ScannetReferenceDataset(ReferenceDataset):
         data_dict["point_clouds"] = point_cloud.astype(np.float32) # point cloud data including features
         data_dict["lang_feat"] = lang_feat.astype(np.float32) # language feature vectors
         data_dict["lang_len"] = np.array(lang_len).astype(np.int64) # length of each description
-        data_dict["lang_ids"] = np.array(self.lang_ids[scene_id][str(object_id)][ann_id]).astype(np.int64)
+        data_dict["lang_ids"] = np.array(self.lang_ids[scene_id][int(object_id)][ann_id]).astype(np.int64)
 
         data_dict["center_label"] = target_bboxes.astype(np.float32)[:,0:3] # (MAX_NUM_OBJ, 3) for GT box center XYZ
         data_dict["heading_class_label"] = angle_classes.astype(np.int64) # (MAX_NUM_OBJ,) with int values in 0,...,NUM_HEADING_BIN-1
@@ -874,7 +874,7 @@ class ScannetReferenceDataset(ReferenceDataset):
         data_dict["object_id"] = np.array(int(object_id)).astype(np.int64)
         data_dict["ann_id"] = np.array(int(ann_id)).astype(np.int64)
         data_dict["object_cat"] = np.array(object_cat).astype(np.int64)
-        data_dict["unique_multiple"] = np.array(self.unique_multiple_lookup[scene_id][str(object_id)][ann_id]).astype(np.int64)
+        data_dict["unique_multiple"] = np.array(self.unique_multiple_lookup[scene_id][int(object_id)][ann_id]).astype(np.int64)
         data_dict["pcl_color"] = pcl_color
 
         data_dict["lang_feat_list"] = np.array(lang_feat_list).astype(np.float32)  # language feature vectors
@@ -911,7 +911,7 @@ class ScannetReferenceDataset(ReferenceDataset):
         for i in range(self.lang_num_max):
             object_id = object_id_list[i]
             ann_id = ann_id_list[i]
-            unique_multiple = self.unique_multiple_lookup[scene_id][str(object_id)][ann_id]
+            unique_multiple = self.unique_multiple_lookup[scene_id][int(object_id)][ann_id]
             unique_multiple_list.append(unique_multiple)
         data_dict["unique_multiple_list"] = np.array(unique_multiple_list).astype(np.int64)
 
@@ -1046,7 +1046,7 @@ class ScannetObjectDataset(ReferenceDataset):
         ann_id = self.scanrefer[idx]["ann_id"]
         
         # get language features
-        lang_feat = self.lang[scene_id][str(object_id)][ann_id]
+        lang_feat = self.lang[scene_id][int(object_id)][ann_id]
         lang_len = len(self.scanrefer[idx]["token"]) + 2
         lang_len = lang_len if lang_len <= CONF.TRAIN.MAX_DES_LEN + 2 else CONF.TRAIN.MAX_DES_LEN + 2
 
@@ -1265,7 +1265,7 @@ class ScannetObjectDataset(ReferenceDataset):
         data_dict["object_bbox_centers"] = object_bbox_centers.astype(np.float32) # box centers of the bounding boxes
         data_dict["lang_feat"] = lang_feat.astype(np.float32) # language feature vectors
         data_dict["lang_len"] = np.array(lang_len).astype(np.int64) # length of each description
-        data_dict["lang_ids"] = np.array(self.lang_ids[scene_id][str(object_id)][ann_id]).astype(np.int64)
+        data_dict["lang_ids"] = np.array(self.lang_ids[scene_id][int(object_id)][ann_id]).astype(np.int64)
         data_dict["dataset_idx"] = np.array(idx).astype(np.int64)
 
         return data_dict

@@ -117,7 +117,6 @@ class ScannetReferenceDataset(Dataset):
 
 
     def __getitem__(self, idx):
-        start = time.time()
 
         # self.shuffle_data()
         # random.shuffle(self.scanrefer_new[idx])
@@ -128,6 +127,7 @@ class ScannetReferenceDataset(Dataset):
         scene_id = self.scanrefer_new[idx][0]["scene_id"]
 
         object_id_list = []
+        eval_type_list = []
         object_name_list = []
         ann_id_list = []
 
@@ -141,6 +141,7 @@ class ScannetReferenceDataset(Dataset):
         for i in range(self.lang_num_max):
             if i < lang_num:
                 object_id = int(self.scanrefer_new[idx][i]["object_id"])
+                eval_type = self.scanrefer_new[idx][i]["eval_type"]
                 object_name = " ".join(self.scanrefer_new[idx][i]["object_name"].split("_"))
                 ann_id = self.scanrefer_new[idx][i]["ann_id"]
 
@@ -153,6 +154,7 @@ class ScannetReferenceDataset(Dataset):
                 unk = self.lang_main[scene_id][str(object_id)][ann_id]["unk"]
 
             object_id_list.append(object_id)
+            eval_type_list.append(eval_type)
             object_name_list.append(object_name)
             ann_id_list.append(ann_id)
 
@@ -369,13 +371,14 @@ class ScannetReferenceDataset(Dataset):
         data_dict["ann_id_list"] = np.array(ann_id_list).astype(np.int64)
         data_dict["object_cat_list"] = np.array(object_cat_list).astype(np.int64)
 
-        unique_multiple_list = []
-        for i in range(self.lang_num_max):
-            object_id = object_id_list[i]
-            ann_id = ann_id_list[i]
-            unique_multiple = self.unique_multiple_lookup[scene_id][str(object_id)][ann_id]
-            unique_multiple_list.append(unique_multiple)
-        data_dict["unique_multiple_list"] = np.array(unique_multiple_list).astype(np.int64)
+        # unique_multiple_list = []
+        # for i in range(self.lang_num_max):
+        #     object_id = object_id_list[i]
+        #     ann_id = ann_id_list[i]
+        #     unique_multiple = self.unique_multiple_lookup[scene_id][str(object_id)][ann_id]
+        #     unique_multiple_list.append(unique_multiple)
+        # data_dict["unique_multiple_list"] = np.array(unique_multiple_list).astype(np.int64)
+        data_dict["eval_type"] = eval_type_list
 
         return data_dict
 

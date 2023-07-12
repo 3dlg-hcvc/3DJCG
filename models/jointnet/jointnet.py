@@ -5,7 +5,6 @@ from macro import *
 from models.base_module.backbone_module import Pointnet2Backbone
 from models.base_module.voting_module import VotingModule
 from models.base_module.lang_module import LangModule
-from models.gt_detector import GTDetector
 from models.proposal_module.proposal_module_fcos import ProposalModule
 from models.proposal_module.relation_module import RelationModule
 from models.refnet.match_module import MatchModule
@@ -36,17 +35,14 @@ class JointNet(nn.Module):
 
         # --------- PROPOSAL GENERATION ---------
         # Backbone point feature learning
-        if not USE_GT:
-            self.backbone_net = Pointnet2Backbone(input_feature_dim=self.input_feature_dim)
+        self.backbone_net = Pointnet2Backbone(input_feature_dim=self.input_feature_dim)
 
-            # Hough voting
-            self.vgen = VotingModule(self.vote_factor, 256)
-            self.proposal = ProposalModule(num_class, num_heading_bin, num_size_cluster, mean_size_arr, num_proposal,
-                                           sampling)
-            self.relation = RelationModule(num_proposals=num_proposal, det_channel=128)  # bef 256
-        else:
-            self.backbone_net = GTDetector()
-            self.relation = RelationModule(num_proposals=num_proposal, det_channel=16)
+        # Hough voting
+        self.vgen = VotingModule(self.vote_factor, 256)
+        self.proposal = ProposalModule(num_class, num_heading_bin, num_size_cluster, mean_size_arr, num_proposal,
+                                       sampling)
+        self.relation = RelationModule(num_proposals=num_proposal, det_channel=128)  # bef 256
+
 
         # Vote aggregation and object proposal
 
@@ -60,12 +56,12 @@ class JointNet(nn.Module):
             # Match the generated proposals and select the most confident ones
             self.match = MatchModule(num_proposals=num_proposal, lang_size=(1 + int(self.use_bidir)) * ground_hidden_size, det_channel=128)  # bef 256
 
-        if not no_caption:
-            if use_topdown:
-                self.caption = TopDownSceneCaptionModule(vocabulary, embeddings, emb_size, 128,
-                    caption_hidden_size, num_proposal, num_locals, query_mode, use_relation)
-            else:
-                self.caption = SceneCaptionModule(vocabulary, embeddings, emb_size, 128, caption_hidden_size, num_proposal)
+        # if not no_caption:
+        #     if use_topdown:
+        #         self.caption = TopDownSceneCaptionModule(vocabulary, embeddings, emb_size, 128,
+        #             caption_hidden_size, num_proposal, num_locals, query_mode, use_relation)
+        #     else:
+        #         self.caption = SceneCaptionModule(vocabulary, embeddings, emb_size, 128, caption_hidden_size, num_proposal)
 
 
     def forward(self, data_dict, use_tf=True, is_eval=False):
@@ -93,30 +89,27 @@ class JointNet(nn.Module):
         #                                     #
         #######################################
 
-        if not USE_GT:
-            # --------- HOUGH VOTING ---------
-            data_dict = self.backbone_net(data_dict)
+        # --------- HOUGH VOTING ---------
+        data_dict = self.backbone_net(data_dict)
 
-            # --------- HOUGH VOTING ---------
-            xyz = data_dict["fp2_xyz"]
-            features = data_dict["fp2_features"]
-            data_dict["seed_inds"] = data_dict["fp2_inds"]
-            data_dict["seed_xyz"] = xyz
-            data_dict["seed_features"] = features
+        # --------- HOUGH VOTING ---------
+        xyz = data_dict["fp2_xyz"]
+        features = data_dict["fp2_features"]
+        data_dict["seed_inds"] = data_dict["fp2_inds"]
+        data_dict["seed_xyz"] = xyz
+        data_dict["seed_features"] = features
 
-            xyz, features = self.vgen(xyz, features)
-            features_norm = torch.norm(features, p=2, dim=1)
-            features = features.div(features_norm.unsqueeze(1))
+        xyz, features = self.vgen(xyz, features)
+        features_norm = torch.norm(features, p=2, dim=1)
+        features = features.div(features_norm.unsqueeze(1))
 
-            data_dict["vote_xyz"] = xyz
-            data_dict["vote_features"] = features
+        data_dict["vote_xyz"] = xyz
+        data_dict["vote_features"] = features
 
-            # --------- PROPOSAL GENERATION ---------
-            data_dict = self.proposal(xyz, features, data_dict)
+        # --------- PROPOSAL GENERATION ---------
+        data_dict = self.proposal(xyz, features, data_dict)
 
-        else:
-            data_dict = self.backbone_net.feed(data_dict)
-            #data_dict["seed_inds"] =
+
 
         data_dict = self.relation(data_dict)
 
@@ -147,7 +140,7 @@ class JointNet(nn.Module):
         #######################################
 
         # --------- CAPTION GENERATION ---------
-        if not self.no_caption:
-            data_dict = self.caption(data_dict, use_tf, is_eval)
+        # if not self.no_caption:
+        #     data_dict = self.caption(data_dict, use_tf, is_eval)
 
         return data_dict

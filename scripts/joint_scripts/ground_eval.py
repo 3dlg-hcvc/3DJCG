@@ -4,7 +4,7 @@ import json
 import pickle
 import argparse
 import torch
-
+from lib.scanrefer_plus_eval_helper import *
 import numpy as np
 
 from torch.utils.data import DataLoader
@@ -27,7 +27,7 @@ from macro import *
 print('Import Done', flush=True)
 SCANREFER_TRAIN = json.load(open(os.path.join(CONF.PATH.DATA, "ScanRefer_filtered_train.json")))
 SCANREFER_VAL = json.load(open(os.path.join(CONF.PATH.DATA, "ScanRefer_filtered_val.json")))
-SCANREFER_TEST = json.load(open(os.path.join(CONF.PATH.DATA, "ScanRefer_filtered_test.json")))
+SCANREFER_TEST = json.load(open(os.path.join(CONF.PATH.DATA, "multi3drefer_filtered_test.json")))
 
 
 def get_dataloader(args, scanrefer, scanrefer_new, all_scene_list, split, config):
@@ -327,7 +327,6 @@ def eval_ref(args):
             with open(pred_path, "wb") as f:
                 pickle.dump(predictions, f)
 
-
             # scanrefer+= support
             if SCANREFER_ENHANCE:
                 for key, value in final_output.items():
@@ -337,6 +336,10 @@ def eval_ref(args):
                     os.makedirs(dir_name, exist_ok=True)
                     with open(f"{dir_name}/{key}.json", "w") as f:
                         json.dump(value, f)
+
+                all_preds, all_gts = load_gt_and_pred_jsons_from_disk(dir_name, "3dvg_gt")
+                iou_25_results, iou_50_results = evaluate_all_scenes(all_preds, all_gts)
+                print_evaluation_results("F1-scores", iou_25_results, iou_50_results)
             # end
 
             # save to global
@@ -597,10 +600,10 @@ if __name__ == "__main__":
     parser.add_argument("--eval", default=0.1)
     args = parser.parse_args()
 
-    assert args.lang_num_max == 1, 'lang max num == 1; avoid bugs'
-    SCANREFER_ENHANCE_VANILLE = args.vanilla
-    SCANREFER_ENHANCE_LOSS_THRESHOLD = args.loss
-    SCANREFER_ENHANCE_EVAL_THRESHOLD = args.eval
+    # assert args.lang_num_max == 1, 'lang max num == 1; avoid bugs'
+    # SCANREFER_ENHANCE_VANILLE = args.vanilla
+    # SCANREFER_ENHANCE_LOSS_THRESHOLD = args.loss
+    # SCANREFER_ENHANCE_EVAL_THRESHOLD = args.eval
     # setting
     # os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     # os.environ["CUDA_LAUNCH_BLOCKING"] = "1"

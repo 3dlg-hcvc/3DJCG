@@ -89,7 +89,7 @@ def get_joint_loss(data_dict, device, config, weights,
         lang_count = data_dict['ref_center_label_list'].shape[1]
         # data_dict["cluster_labels"] = objectness_label.new_zeros(objectness_label.shape).cuda().repeat(lang_count, 1)
         data_dict["cluster_labels"] = cluster_labels
-        data_dict["cluster_ref"] = objectness_label.new_zeros(objectness_label.shape).float().cuda().repeat(lang_count, 1)
+        data_dict["cluster_ref"] = objectness_label.new_zeros(objectness_label.shape, device="cuda", dtype=torch.float32).repeat(lang_count, 1)
         # store
         data_dict["ref_loss"] = torch.zeros(1)[0].cuda()
         # data_dict['max_iou_rate_0.25'] = 0

@@ -32,8 +32,8 @@ from macro import *
 
 # extracted ScanNet object rotations from Scan2CAD 
 # NOTE some scenes are missing in this annotation!!!
-SCANREFER_TRAIN = json.load(open(os.path.join(CONF.PATH.DATA, "ScanRefer_filtered_train.json")))
-SCANREFER_VAL = json.load(open(os.path.join(CONF.PATH.DATA, "ScanRefer_filtered_val.json")))
+SCANREFER_TRAIN = json.load(open(os.path.join(CONF.PATH.DATA, "multi3drefer_train.json")))
+SCANREFER_VAL = json.load(open(os.path.join(CONF.PATH.DATA, "multi3drefer_val.json")))
 SCAN2CAD_ROTATION = json.load(open(os.path.join(CONF.PATH.SCAN2CAD, "scannet_instance_rotations.json")))
 # SCAN2CAD_ROTATION = None
 # constants
@@ -59,70 +59,11 @@ def get_dataloader(args, scanrefer, scanrefer_new, all_scene_list, split, config
         scan2cad_rotation=scan2cad_rotation
     )
     # dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
-    if USE_GT:
-        dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=shuffle, num_workers=4, pin_memory=True,
-                                collate_fn=_collate_fn)
-    else:
-        dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=shuffle, num_workers=4, pin_memory=True)
+
+    dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=shuffle, num_workers=4, pin_memory=True)
 
     return dataset, dataloader
 
-def _collate_fn(batch):
-    locs_scaled = []
-    gt_proposals_idx = []
-    gt_proposals_offset = []
-    me_feats = []
-    batch_offsets = [0]
-    total_num_inst = 0
-    total_points = 0
-    # instance_info = []
-    #instance_offsets = [0]
-    instance_ids = []
-    for i, b in enumerate(batch):
-        locs_scaled.append(
-            torch.cat([
-                torch.LongTensor(b["locs_scaled"].shape[0], 1).fill_(i),
-                torch.from_numpy(b["locs_scaled"]).long()
-            ], 1))
-        batch_offsets.append(batch_offsets[-1] + b["locs_scaled"].shape[0])
-        me_feats.append(torch.cat((torch.from_numpy(b["point_clouds"][:, 3:]), torch.from_numpy(b["point_clouds"][:, 0:3])), 1))
-
-        if "gt_proposals_idx" in b:
-            gt_proposals_idx_i = b["gt_proposals_idx"]
-            gt_proposals_idx_i[:, 0] += total_num_inst
-            gt_proposals_idx_i[:, 1] += total_points
-            gt_proposals_idx.append(torch.from_numpy(b["gt_proposals_idx"]))
-            if gt_proposals_offset != []:
-                gt_proposals_offset_i = b["gt_proposals_offset"]
-                gt_proposals_offset_i += gt_proposals_offset[-1][-1].item()
-                gt_proposals_offset.append(torch.from_numpy(gt_proposals_offset_i[1:]))
-            else:
-                gt_proposals_offset.append(torch.from_numpy(b["gt_proposals_offset"]))
-
-        instance_ids_i = b["instance_ids"]
-        instance_ids_i[np.where(instance_ids_i != 0)] += total_num_inst
-        total_num_inst += b["gt_proposals_offset"].shape[0] - 1
-        total_points += len(instance_ids_i)
-        instance_ids.append(torch.from_numpy(instance_ids_i))
-
-        # instance_info.append(torch.from_numpy(b["instance_info"]))
-        # instance_offsets.append(instance_offsets[-1] + b["instances_bboxes_tmp"].shape[0])
-
-        b.pop("instance_ids", None)
-        b.pop("locs_scaled", None)
-        b.pop("gt_proposals_idx", None)
-        b.pop("gt_proposals_offset", None)
-
-    data_dict = default_collate(batch)
-    data_dict["locs_scaled"] = torch.cat(locs_scaled, 0)
-    data_dict["batch_offsets"] = torch.tensor(batch_offsets, dtype=torch.int)
-    data_dict["gt_proposals_idx"] = torch.cat(gt_proposals_idx, 0)
-    data_dict["gt_proposals_offset"] = torch.cat(gt_proposals_offset, 0)
-    data_dict["voxel_locs"], data_dict["p2v_map"], data_dict["v2p_map"] = pointgroup_ops.voxelization_idx(data_dict["locs_scaled"], len(batch), 4)
-
-    data_dict["feats"] = torch.cat(me_feats, 0)
-
-    return data_dict
 
 def get_model(args, dataset, device):
     # initiate model
@@ -338,12 +279,12 @@ def get_scannet_scene_list(split):
 
 def get_scanrefer(args):
     if args.dataset == "ScanRefer":
-        scanrefer_train = json.load(open(os.path.join(CONF.PATH.DATA, "ScanRefer_filtered_train.json")))
-        scanrefer_eval_train = json.load(open(os.path.join(CONF.PATH.DATA, "ScanRefer_filtered_train.json")))
-        scanrefer_eval_val = json.load(open(os.path.join(CONF.PATH.DATA, "ScanRefer_filtered_val.json")))
+        scanrefer_train = json.load(open(os.path.join(CONF.PATH.DATA, "multi3drefer_train.json")))
+        #scanrefer_eval_train = json.load(open(os.path.join(CONF.PATH.DATA, "multi3drefer_train.json")))
+        scanrefer_eval_val = json.load(open(os.path.join(CONF.PATH.DATA, "multi3drefer_val.json")))
     elif args.dataset == "ReferIt3D":
         scanrefer_train = json.load(open(os.path.join(CONF.PATH.DATA, "nr3d_train.json")))
-        scanrefer_eval_train = json.load(open(os.path.join(CONF.PATH.DATA, "nr3d_train.json")))
+        #scanrefer_eval_train = json.load(open(os.path.join(CONF.PATH.DATA, "nr3d_train.json")))
         scanrefer_eval_val = json.load(open(os.path.join(CONF.PATH.DATA, "nr3d_val.json")))
     else:
         raise ValueError("Invalid dataset.")

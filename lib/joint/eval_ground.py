@@ -65,7 +65,7 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
 
     if post_processing:
         _ = parse_predictions(data_dict, post_processing)
-        nms_masks = torch.LongTensor(data_dict['pred_mask']).cuda()
+        nms_masks = torch.cuda.LongTensor(data_dict['pred_mask'])
 
         # construct valid mask
         pred_masks = (nms_masks * objectness_preds_batch == 1).float()
@@ -80,7 +80,7 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
     batch_size, len_nun_max = data_dict["multi_ref_box_label_list"].shape[:2]
     cluster_preds = torch.argmax(data_dict["cluster_ref"], 1).long().unsqueeze(1).repeat(1,pred_masks.shape[1])
 
-    preds = torch.zeros(data_dict["cluster_ref"].shape).cuda()
+    preds = torch.zeros(data_dict["cluster_ref"].shape, device="cuda")
     preds = preds.scatter_(1, cluster_preds, 1)
     cluster_preds = preds
     cluster_labels = data_dict["cluster_labels"].reshape(batch_size*len_nun_max, -1).float()
@@ -89,7 +89,7 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
 
     # compute classification scores
     corrects = torch.sum((cluster_preds == 1) * (cluster_labels == 1), dim=1).float()
-    labels = torch.ones(corrects.shape[0]).cuda()
+    labels = torch.ones(corrects.shape[0], device="cuda")
     ref_acc = corrects / (labels + 1e-8)
 
     # store
@@ -107,7 +107,7 @@ def get_eval(data_dict, config, reference, use_lang_classifier=False, use_oracle
         # store the calibrated predictions and masks
         data_dict['cluster_ref'] = data_dict["cluster_labels"]
     if use_cat_rand:
-        cluster_preds = torch.zeros(cluster_labels.shape).cuda()
+        cluster_preds = torch.zeros(cluster_labels.shape, device="cuda")
         for i in range(cluster_preds.shape[0]):
             num_bbox = data_dict["num_bbox"][i]
             sem_cls_label = data_dict["sem_cls_label"][i]

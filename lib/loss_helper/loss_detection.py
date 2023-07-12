@@ -95,15 +95,15 @@ def compute_objectness_loss(data_dict):
     # objectness_label: 1 if pred object center is within NEAR_THRESHOLD of any GT object
     # objectness_mask: 0 if pred object center is in gray zone (DONOTCARE), 1 otherwise
     euclidean_dist1 = torch.sqrt(dist1 + 1e-6)
-    objectness_label = torch.zeros((B, K), dtype=torch.long).cuda()
-    objectness_mask = torch.zeros((B, K)).cuda()
+    objectness_label = torch.zeros((B, K), dtype=torch.long, device="cuda")
+    objectness_mask = torch.zeros((B, K), device="cuda")
     objectness_label[euclidean_dist1 < NEAR_THRESHOLD] = 1
     objectness_mask[euclidean_dist1 < NEAR_THRESHOLD] = 1
     objectness_mask[euclidean_dist1 > FAR_THRESHOLD] = 1
 
     # Compute objectness loss
     objectness_scores = data_dict['objectness_scores']
-    criterion = nn.CrossEntropyLoss(torch.Tensor(OBJECTNESS_CLS_WEIGHTS).cuda(), reduction='none')
+    criterion = nn.CrossEntropyLoss(torch.tensor(OBJECTNESS_CLS_WEIGHTS, device="cuda"), reduction='none')
     objectness_loss = criterion(objectness_scores.transpose(2, 1), objectness_label)
     objectness_loss = torch.sum(objectness_loss * objectness_mask) / (torch.sum(objectness_mask) + 1e-6)
 
@@ -170,12 +170,12 @@ def recover_assigned_gt_bboxes(data_dict, config, object_assignment):
     if num_heading_bin != 1:  # for SUN RGBD
         gt_heading = heading_class_label.float() * ((2*np.pi)/float(num_heading_bin)) + heading_residual_label
     else:  # for ScanNetV2
-        gt_heading = torch.zeros((batch_size, num_proposal)).cuda()
+        gt_heading = torch.zeros((batch_size, num_proposal), device="cuda")
 
     # gather gt bbox size
     size_class_label = torch.gather(data_dict['size_class_label'], 1, object_assignment)  # (B, K)
     size_residual_label = torch.gather(data_dict['size_residual_label'], 1, object_assignment.unsqueeze(-1).repeat(1,1,3))  # (B, N, 3)
-    mean_size_arr_expanded = torch.ones((batch_size, num_proposal, num_size_cluster, 3)).cuda() * torch.from_numpy(mean_size_arr.astype(np.float32)).cuda().unsqueeze(0).unsqueeze(0)  # (B, N, num_size_cluster, 3)
+    mean_size_arr_expanded = torch.ones((batch_size, num_proposal, num_size_cluster, 3), device="cuda") * torch.from_numpy(mean_size_arr.astype(np.float32)).cuda().unsqueeze(0).unsqueeze(0)  # (B, N, num_size_cluster, 3)
     mean_size = torch.gather(mean_size_arr_expanded, 2, size_class_label.unsqueeze(-1).unsqueeze(-1).repeat(1,1,1,3)).squeeze(2)  # (B, N, 3)
     gt_bbox_size = mean_size + size_residual_label  # (B, N, 3)
     gt_bbox_size_half = gt_bbox_size / 2  # (B, N, 3)

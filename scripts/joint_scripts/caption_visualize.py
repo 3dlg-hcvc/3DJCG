@@ -359,7 +359,7 @@ def visualize(args):
 
         # nms mask
         _ = parse_predictions(data_dict, POST_DICT)
-        nms_masks = torch.LongTensor(data_dict["pred_mask"]).cuda()
+        nms_masks = torch.cuda.LongTensor(data_dict["pred_mask"])
 
         # objectness mask
         obj_masks = torch.argmax(data_dict["objectness_scores"], 2).long()

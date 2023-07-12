@@ -119,7 +119,7 @@ def feed_scene_cap(model, device, dataset, dataloader, phase, folder,
 
         # nms mask
         _ = parse_predictions(data_dict, POST_DICT)
-        nms_masks = torch.LongTensor(data_dict["pred_mask"]).cuda()
+        nms_masks = torch.cuda.LongTensor(data_dict["pred_mask"])
 
         # objectness mask
         obj_masks = torch.argmax(data_dict["objectness_scores"], 2).long()
