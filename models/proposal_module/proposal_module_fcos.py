@@ -51,17 +51,15 @@ class ProposalModule(nn.Module):
         """
 
         # Farthest point sampling (FPS) on votes
-        if not USE_GT:
-            xyz, features, fps_inds = self.vote_aggregation(xyz, features)
 
-            sample_inds = fps_inds
+        xyz, features, fps_inds = self.vote_aggregation(xyz, features)
 
-            data_dict['aggregated_vote_xyz'] = xyz # (batch_size, num_proposal, 3)
-            data_dict['aggregated_vote_features'] = features.permute(0, 2, 1).contiguous() # (batch_size, num_proposal, 128)
-            data_dict['aggregated_vote_inds'] = sample_inds # (batch_size, num_proposal,) # should be 0,1,2,...,num_proposal
-        else:
-            data_dict['aggregated_vote_xyz'] = xyz  # (batch_size, num_proposal, 3)
-            data_dict['aggregated_vote_features'] = features
+        sample_inds = fps_inds
+
+        data_dict['aggregated_vote_xyz'] = xyz # (batch_size, num_proposal, 3)
+        data_dict['aggregated_vote_features'] = features.permute(0, 2, 1).contiguous() # (batch_size, num_proposal, 128)
+        data_dict['aggregated_vote_inds'] = sample_inds # (batch_size, num_proposal,) # should be 0,1,2,...,num_proposal
+
 
         # --------- PROPOSAL GENERATION ---------
         data_dict = self.proposal(features, data_dict)

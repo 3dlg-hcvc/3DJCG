@@ -518,6 +518,7 @@ class ScannetReferenceDataset(ReferenceDataset):
 
         object_name_list = []
         ann_id_list = []
+        eval_type_list = []
 
         lang_feat_list = []
         lang_len_list = []
@@ -542,6 +543,7 @@ class ScannetReferenceDataset(ReferenceDataset):
         for i in range(self.lang_num_max):
             if i < lang_num:
                 object_id = int(self.scanrefer_new[idx][i]["object_id"])
+                eval_type = self.scanrefer_new[idx][i]["eval_type"]
                 if SCANREFER_ENHANCE:
                     # scanrefer++ support
                     object_ids = self.scanrefer_new[idx][i]["object_ids"]
@@ -566,6 +568,7 @@ class ScannetReferenceDataset(ReferenceDataset):
                 ground_first_obj = self.ground_lang_main[scene_id][int(object_id)][ann_id]["first_obj"]
 
             object_id_list.append(object_id)
+            eval_type_list.append(eval_type)
             if SCANREFER_ENHANCE:
                 multi_obj_ids_list.append(object_ids)
             object_name_list.append(object_name)
@@ -801,6 +804,7 @@ class ScannetReferenceDataset(ReferenceDataset):
             pass
 
         object_cat_list = []
+
         for i in range(self.lang_num_max):
             object_cat = self.raw2label[object_name_list[i]] if object_name_list[i] in self.raw2label else 17
             object_cat_list.append(object_cat)
@@ -900,7 +904,7 @@ class ScannetReferenceDataset(ReferenceDataset):
         data_dict["object_id"] = np.array(object_id_list).astype(np.int64)
         data_dict["ann_id"] = np.array(ann_id_list).astype(np.int64)
         data_dict["object_cat_list"] = np.array(object_cat_list).astype(np.int64)
-
+        data_dict["eval_type"] = eval_type_list
         data_dict["gt_box_num_list"] = np.array(gt_box_num_list).astype(np.int32)
 
         if SCANREFER_ENHANCE:

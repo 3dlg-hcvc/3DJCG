@@ -68,10 +68,10 @@ class RelationModule(nn.Module):
         features = data_dict['pred_bbox_feature'].permute(0, 2, 1)
         features = self.features_concat(features).permute(0, 2, 1)
 
-        if USE_GT:
-            pred_bboxes = get_3d_box_batch(data_dict["pred_size"].detach().cpu().numpy(),
-                                           data_dict['pred_heading'].detach().cpu().numpy(), data_dict["pred_center"].detach().cpu().numpy())
-            data_dict['pred_bbox_corner'] = torch.from_numpy(pred_bboxes).float().to("cuda")
+        # if USE_GT:
+        #     pred_bboxes = get_3d_box_batch(data_dict["pred_size"].detach().cpu().numpy(),
+        #                                    data_dict['pred_heading'].detach().cpu().numpy(), data_dict["pred_center"].detach().cpu().numpy())
+        #     data_dict['pred_bbox_corner'] = torch.from_numpy(pred_bboxes).float().to("cuda")
 
 
         # B, N = features.shape[:2]
@@ -133,8 +133,10 @@ class RelationModule(nn.Module):
 
             # box embedding
             if self.use_box_embedding:
-
-                corners = data_dict['pred_bbox_corner']
+                if not USE_GT:
+                    corners = data_dict['pred_bbox_corner']
+                else:
+                    corners = data_dict['pred_bbox_corner']
                 centers = self._get_bbox_centers(corners)  # batch_size, num_proposals, 3
                 num_proposals = centers.shape[1]
                 # attention weight
