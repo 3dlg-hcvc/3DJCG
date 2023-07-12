@@ -85,58 +85,58 @@ class ReferenceDataset(Dataset):
         gt_proposals_idx = np.concatenate(gt_proposals_idx, axis=0)
         gt_proposals_offset = np.array(gt_proposals_offset).astype(np.int32)
         return gt_proposals_idx, gt_proposals_offset, object_ids
-    def _get_unique_multiple_lookup(self):
-        all_sem_labels = {}
-        cache = {}
-        for data in self.scanrefer:
-            scene_id = data["scene_id"]
-            object_id = data["object_id"]
-            object_name = " ".join(data["object_name"].split("_"))
-            ann_id = data["ann_id"]
+    # def _get_unique_multiple_lookup(self):
+    #     all_sem_labels = {}
+    #     cache = {}
+    #     for data in self.scanrefer:
+    #         scene_id = data["scene_id"]
+    #         object_id = data["object_id"]
+    #         object_name = " ".join(data["object_name"].split("_"))
+    #         ann_id = data["ann_id"]
 
-            if scene_id not in all_sem_labels:
-                all_sem_labels[scene_id] = []
+    #         if scene_id not in all_sem_labels:
+    #             all_sem_labels[scene_id] = []
 
-            if scene_id not in cache:
-                cache[scene_id] = {}
+    #         if scene_id not in cache:
+    #             cache[scene_id] = {}
 
-            if object_id not in cache[scene_id]:
-                cache[scene_id][object_id] = {}
-                try:
-                    all_sem_labels[scene_id].append(self.raw2label[object_name])
-                except KeyError:
-                    all_sem_labels[scene_id].append(17)
+    #         if object_id not in cache[scene_id]:
+    #             cache[scene_id][object_id] = {}
+    #             try:
+    #                 all_sem_labels[scene_id].append(self.raw2label[object_name])
+    #             except KeyError:
+    #                 all_sem_labels[scene_id].append(17)
 
-        # convert to numpy array
-        all_sem_labels = {scene_id: np.array(all_sem_labels[scene_id]) for scene_id in all_sem_labels.keys()}
+    #     # convert to numpy array
+    #     all_sem_labels = {scene_id: np.array(all_sem_labels[scene_id]) for scene_id in all_sem_labels.keys()}
 
-        unique_multiple_lookup = {}
-        for data in self.scanrefer:
-            scene_id = data["scene_id"]
-            object_id = data["object_id"]
-            object_name = " ".join(data["object_name"].split("_"))
-            ann_id = data["ann_id"]
+    #     unique_multiple_lookup = {}
+    #     for data in self.scanrefer:
+    #         scene_id = data["scene_id"]
+    #         object_id = data["object_id"]
+    #         object_name = " ".join(data["object_name"].split("_"))
+    #         ann_id = data["ann_id"]
 
-            try:
-                sem_label = self.raw2label[object_name]
-            except KeyError:
-                sem_label = 17
+    #         try:
+    #             sem_label = self.raw2label[object_name]
+    #         except KeyError:
+    #             sem_label = 17
 
-            unique_multiple = 0 if (all_sem_labels[scene_id] == sem_label).sum() == 1 else 1
+    #         unique_multiple = 0 if (all_sem_labels[scene_id] == sem_label).sum() == 1 else 1
 
-            # store
-            if scene_id not in unique_multiple_lookup:
-                unique_multiple_lookup[scene_id] = {}
+    #         # store
+    #         if scene_id not in unique_multiple_lookup:
+    #             unique_multiple_lookup[scene_id] = {}
 
-            if object_id not in unique_multiple_lookup[scene_id]:
-                unique_multiple_lookup[scene_id][object_id] = {}
+    #         if object_id not in unique_multiple_lookup[scene_id]:
+    #             unique_multiple_lookup[scene_id][object_id] = {}
 
-            if ann_id not in unique_multiple_lookup[scene_id][object_id]:
-                unique_multiple_lookup[scene_id][object_id][ann_id] = None
+    #         if ann_id not in unique_multiple_lookup[scene_id][object_id]:
+    #             unique_multiple_lookup[scene_id][object_id][ann_id] = None
 
-            unique_multiple_lookup[scene_id][object_id][ann_id] = unique_multiple
+    #         unique_multiple_lookup[scene_id][object_id][ann_id] = unique_multiple
 
-        return unique_multiple_lookup
+    #     return unique_multiple_lookup
 
     def _tranform_des(self):
         lang = {}
@@ -386,19 +386,19 @@ class ReferenceDataset(Dataset):
             self.scene_data[scene_id]["instance_bboxes"] = np.load(os.path.join(CONF.PATH.SCANNET_DATA, scene_id)+"_aligned_bbox.npy")
 
         # prepare class mapping
-        lines = [line.rstrip() for line in open(SCANNET_V2_TSV)]
-        lines = lines[1:]
-        raw2nyuid = {}
-        for i in range(len(lines)):
-            elements = lines[i].split('\t')
-            raw_name = elements[1]
-            nyu40_name = int(elements[4])
-            raw2nyuid[raw_name] = nyu40_name
+        # lines = [line.rstrip() for line in open(SCANNET_V2_TSV)]
+        # lines = lines[1:]
+        # raw2nyuid = {}
+        # for i in range(len(lines)):
+        #     elements = lines[i].split('\t')
+        #     raw_name = elements[1]
+        #     nyu40_name = int(elements[4])
+        #     raw2nyuid[raw_name] = nyu40_name
 
-        # store
-        self.raw2nyuid = raw2nyuid
+        # # store
+        # self.raw2nyuid = raw2nyuid
 
-        self.unique_multiple_lookup = self._get_unique_multiple_lookup()
+        # self.unique_multiple_lookup = self._get_unique_multiple_lookup()
 
     def _translate(self, point_set, bbox):
         # unpack
@@ -506,7 +506,7 @@ class ScannetReferenceDataset(ReferenceDataset):
         print('shuffle done', flush=True)
 
     def __getitem__(self, idx):
-        start = time.time()
+        # start = time.time()
         lang_num = len(self.scanrefer_new[idx])
         scene_id = self.scanrefer_new[idx][0]["scene_id"]
 
@@ -907,13 +907,13 @@ class ScannetReferenceDataset(ReferenceDataset):
         if SCANREFER_ENHANCE:
             data_dict["multi_ref_box_label_list"] = np.array(multi_ref_box_label_list)
 
-        unique_multiple_list = []
-        for i in range(self.lang_num_max):
-            object_id = object_id_list[i]
-            ann_id = ann_id_list[i]
-            unique_multiple = self.unique_multiple_lookup[scene_id][int(object_id)][ann_id]
-            unique_multiple_list.append(unique_multiple)
-        data_dict["unique_multiple_list"] = np.array(unique_multiple_list).astype(np.int64)
+        # unique_multiple_list = []
+        # for i in range(self.lang_num_max):
+        #     object_id = object_id_list[i]
+        #     ann_id = ann_id_list[i]
+            # unique_multiple = self.unique_multiple_lookup[scene_id][int(object_id)][ann_id]
+            # unique_multiple_list.append(unique_multiple)
+        # data_dict["unique_multiple_list"] = np.array(unique_multiple_list).astype(np.int64)
 
         return data_dict
 
@@ -943,7 +943,7 @@ class ScannetReferenceTestDataset():
         return len(self.scanrefer_all_scene)
 
     def __getitem__(self, idx):
-        start = time.time()
+        # start = time.time()
 
         scene_id = self.scanrefer_all_scene[idx]
 
@@ -1039,7 +1039,7 @@ class ScannetObjectDataset(ReferenceDataset):
         return len(self.scanrefer)
 
     def __getitem__(self, idx):
-        start = time.time()
+        # start = time.time()
         scene_id = self.scanrefer[idx]["scene_id"]
         object_id = int(self.scanrefer[idx]["object_id"])
         object_name = " ".join(self.scanrefer[idx]["object_name"].split("_"))
