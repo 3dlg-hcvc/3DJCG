@@ -251,8 +251,8 @@ class Solver():
         self.bn_decay_step = bn_decay_step
         self.bn_decay_rate = bn_decay_rate
 
-        self.criterion = criterion
-        self.checkpoint_best = checkpoint_best
+        # self.criterion = criterion
+        # self.checkpoint_best = checkpoint_best
 
         self.evaluator = Multi3DReferEvaluator(verbose=False, metric_name="f1")
 
@@ -890,7 +890,7 @@ class Solver():
                     data_dict["epoch"] = epoch_id
                     data_dict = self._forward(data_dict)
                     # self._compute_loss(data_dict)
-                    pred, gt = self._eval(data_dict)
+                    pred, gt = get_eval_multi3drefer(data_dict, self.config)
                     total_pred.update(pred)
                     total_gt.update(gt)
                     # eval

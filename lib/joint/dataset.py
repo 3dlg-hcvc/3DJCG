@@ -871,8 +871,8 @@ class ScannetReferenceDataset(ReferenceDataset):
         # data_dict["gt_box_corner_label"] = gt_box_corner_label.astype(np.float64) # all GT box corners NOTE type must be double
         # data_dict["gt_box_masks"] = gt_box_masks.astype(np.int64) # valid bbox masks
         # data_dict["gt_box_object_ids"] = gt_box_object_ids.astype(np.int64) # valid bbox object ids
-        data_dict["object_id"] = np.array(int(object_id)).astype(np.int64)
-        data_dict["ann_id"] = np.array(int(ann_id)).astype(np.int64)
+        # data_dict["object_id"] = np.array(int(object_id)).astype(np.int64)
+        # data_dict["ann_id"] = np.array(int(ann_id)).astype(np.int64)
         data_dict["object_cat"] = np.array(object_cat).astype(np.int64)
         # data_dict["unique_multiple"] = np.array(self.unique_multiple_lookup[scene_id][int(object_id)][ann_id]).astype(np.int64)
 
@@ -897,8 +897,8 @@ class ScannetReferenceDataset(ReferenceDataset):
         #data_dict["ref_size_class_label_list"] = np.array(ref_size_class_label_list).astype(np.int64)
         #data_dict["ref_size_residual_label_list"] = np.array(ref_size_residual_label_list).astype(np.float32)
         # data_dict["ref_box_corner_label_list"] = np.array(ref_box_corner_label_list).astype(np.float64)
-        data_dict["object_id_list"] = np.array(object_id_list).astype(np.int64)
-        data_dict["ann_id_list"] = np.array(ann_id_list).astype(np.int64)
+        data_dict["object_id"] = np.array(object_id_list).astype(np.int64)
+        data_dict["ann_id"] = np.array(ann_id_list).astype(np.int64)
         data_dict["object_cat_list"] = np.array(object_cat_list).astype(np.int64)
 
         data_dict["gt_box_num_list"] = np.array(gt_box_num_list).astype(np.int32)

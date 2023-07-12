@@ -1,13 +1,13 @@
 # HACK ignore warnings
-import warnings
-warnings.filterwarnings("ignore", category=FutureWarning)
+# import warnings
+# warnings.filterwarnings("ignore", category=FutureWarning)
 
 import os
 import sys
 import json
 import argparse
 import torch
-from torch.utils.data._utils.collate import default_collate
+# from torch.utils.data._utils.collate import default_collate
 
 
 import numpy as np
@@ -18,7 +18,6 @@ from copy import deepcopy
 
 sys.path.append(os.path.join(os.getcwd())) # HACK add the root folder
 from data.scannet.model_util_scannet import ScannetDatasetConfig
-from lib.pointgroup_ops.functions import pointgroup_ops
 from lib.joint.dataset import ScannetReferenceDataset
 from lib.joint.solver_3djcg import Solver
 from lib.configs.config_joint import CONF
@@ -291,7 +290,7 @@ def get_scanrefer(args):
 
     if args.debug:
         scanrefer_train = [SCANREFER_TRAIN[0]]
-        scanrefer_eval_train = [SCANREFER_TRAIN[0]]
+        # scanrefer_eval_train = [SCANREFER_TRAIN[0]]
         scanrefer_eval_val = [SCANREFER_TRAIN[0]]
 
     if args.no_caption and args.no_reference:
