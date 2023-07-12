@@ -737,7 +737,7 @@ class Solver():
                 # move to cuda
                 for key in data_dict:
                     # data_dict[key] = data_dict[key].cuda()
-                    if key != "scene_id" and key != "eval_type":
+                    if key != "scene_id" and key != "eval_type" and key != "istrain":
                         data_dict[key] = data_dict[key].to(self.device)
 
                 # initialize the running loss
@@ -859,7 +859,7 @@ class Solver():
                     # move to cuda
                     for key in data_dict:
                         # data_dict[key] = data_dict[key].cuda()
-                        if key != "scene_id" and key != "eval_type":
+                        if key != "scene_id" and key != "eval_type" and key != "istrain":
                             data_dict[key] = data_dict[key].to(self.device)
                     # scanrefer++ support
                     # if SCANREFER_ENHANCE:
