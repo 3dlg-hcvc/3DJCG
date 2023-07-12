@@ -825,14 +825,14 @@ class ScannetReferenceDataset(ReferenceDataset):
                     pass
 
         data_dict = {}
-        if USE_GT:
-            scale = 50
-            scaled_points = point_cloud[:, :3] * scale
-            scaled_points -= scaled_points.min(0)
-            data_dict["locs_scaled"] = scaled_points.astype(np.float32)
-            gt_proposals_idx, gt_proposals_offset, _ = self._generate_gt_clusters(instance_labels, semantic_labels)
-            data_dict["gt_proposals_idx"] = gt_proposals_idx
-            data_dict["gt_proposals_offset"] = gt_proposals_offset
+        # if USE_GT:
+        #     scale = 50
+        #     scaled_points = point_cloud[:, :3] * scale
+        #     scaled_points -= scaled_points.min(0)
+        #     data_dict["locs_scaled"] = scaled_points.astype(np.float32)
+        #     gt_proposals_idx, gt_proposals_offset, _ = self._generate_gt_clusters(instance_labels, semantic_labels)
+        #     data_dict["gt_proposals_idx"] = gt_proposals_idx
+        #     data_dict["gt_proposals_offset"] = gt_proposals_offset
         data_dict["unk"] = unk.astype(np.float32)
         data_dict["istrain"] = istrain
         data_dict["scene_id"] = scene_id
@@ -857,7 +857,7 @@ class ScannetReferenceDataset(ReferenceDataset):
         data_dict["box_label_mask"] = target_bboxes_mask.astype(np.float32) # (MAX_NUM_OBJ) as 0/1 with 1 indicating a unique box
         data_dict["vote_label"] = point_votes.astype(np.float32)
         data_dict["vote_label_mask"] = point_votes_mask.astype(np.int64)
-        data_dict["dataset_idx"] = np.array(idx).astype(np.int64)
+        # data_dict["dataset_idx"] = np.array(idx).astype(np.int64)
         data_dict["scan_idx"] = np.array(idx).astype(np.int64)
         data_dict["pcl_color"] = pcl_color
         data_dict["instance_ids"] = instance_labels.astype(np.int32)
@@ -875,7 +875,6 @@ class ScannetReferenceDataset(ReferenceDataset):
         data_dict["ann_id"] = np.array(int(ann_id)).astype(np.int64)
         data_dict["object_cat"] = np.array(object_cat).astype(np.int64)
         # data_dict["unique_multiple"] = np.array(self.unique_multiple_lookup[scene_id][int(object_id)][ann_id]).astype(np.int64)
-        data_dict["pcl_color"] = pcl_color
 
         data_dict["lang_feat_list"] = np.array(lang_feat_list).astype(np.float32)  # language feature vectors
         data_dict["lang_len_list"] = np.array(lang_len_list).astype(np.int64)  # length of each description
@@ -980,7 +979,7 @@ class ScannetReferenceTestDataset():
 
         data_dict = {}
         data_dict["point_clouds"] = point_cloud.astype(np.float32) # point cloud data including features
-        data_dict["dataset_idx"] = idx
+        # data_dict["dataset_idx"] = idx
         data_dict["lang_feat"] = self.glove["sos"].astype(np.float32) # GloVE embedding for sos token
 
         return data_dict
@@ -1266,7 +1265,7 @@ class ScannetObjectDataset(ReferenceDataset):
         data_dict["lang_feat"] = lang_feat.astype(np.float32) # language feature vectors
         data_dict["lang_len"] = np.array(lang_len).astype(np.int64) # length of each description
         data_dict["lang_ids"] = np.array(self.lang_ids[scene_id][int(object_id)][ann_id]).astype(np.int64)
-        data_dict["dataset_idx"] = np.array(idx).astype(np.int64)
+        # data_dict["dataset_idx"] = np.array(idx).astype(np.int64)
 
         return data_dict
     

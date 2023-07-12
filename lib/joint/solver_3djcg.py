@@ -390,7 +390,7 @@ class Solver():
                 print("update batch normalization momentum --> {}\n".format(self.bn_scheduler.lmbd(self.bn_scheduler.last_epoch)))
                 self.bn_scheduler.step()
 
-            if epoch_id % 10 == 0 and epoch_id != 0:
+            if epoch_id % 10 == 0:
                 with torch.no_grad():
                     torch.cuda.empty_cache()
                     self._feed(self.dataloader["eval"]["val"], "val", epoch_id, is_eval=True)
