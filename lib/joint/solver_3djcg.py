@@ -855,7 +855,7 @@ class Solver():
                 total_pred = {}
                 total_gt = {}
                 best_model_f1 = 0
-                for data_dict in enumerate(tqdm(dataloader)):
+                for data_dict in tqdm(dataloader):
                     # move to cuda
                     for key in data_dict:
                         # data_dict[key] = data_dict[key].cuda()
