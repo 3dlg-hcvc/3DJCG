@@ -95,7 +95,8 @@ class StandardROIHeads(nn.Module):
     def forward(
             self,
             ROI_features,
-            data_dict
+            data_dict,
+            use_gt=False
     ):
         batch_size, num_proposal, _ = ROI_features.shape
 
@@ -103,7 +104,13 @@ class StandardROIHeads(nn.Module):
         x = self.convs(ROI_features)
 
         # (batch_size, num_proposal, 2)
-        pred_objectness_logits = self.objectness_predictor(x).permute(0,2,1)
+        if use_gt:
+            final_fps_ind = torch.gather(data_dict["seed_inds"], dim=1, index=data_dict['aggregated_vote_inds'].long())
+            obj_scores = torch.gather(data_dict["vote_label_mask"], dim=1, index=final_fps_ind.long())
+            new_obj_scores = torch.unsqueeze(obj_scores, dim=-1)
+            pred_objectness_logits = torch.cat([1 - new_obj_scores, new_obj_scores], dim=-1)
+        else:
+            pred_objectness_logits = self.objectness_predictor(x).permute(0,2,1)
 
         # (batch_size, num_proposal, 6)
         pred_box_reg = self.box_predictor(x).permute(0,2,1)

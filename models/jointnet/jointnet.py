@@ -8,7 +8,7 @@ from models.base_module.lang_module import LangModule
 from models.proposal_module.proposal_module_fcos import ProposalModule
 from models.proposal_module.relation_module import RelationModule
 from models.refnet.match_module import MatchModule
-from models.capnet.caption_module import SceneCaptionModule, TopDownSceneCaptionModule
+# from models.capnet.caption_module import SceneCaptionModule, TopDownSceneCaptionModule
 
 class JointNet(nn.Module):
     def __init__(self, num_class, num_heading_bin, num_size_cluster, mean_size_arr, vocabulary, embeddings,
@@ -99,12 +99,12 @@ class JointNet(nn.Module):
         data_dict["seed_xyz"] = xyz
         data_dict["seed_features"] = features
 
-        xyz, features = self.vgen(xyz, features)
+        xyz, features = self.vgen(data_dict, xyz, features, use_gt=USE_GT)
         features_norm = torch.norm(features, p=2, dim=1)
         features = features.div(features_norm.unsqueeze(1))
 
         data_dict["vote_xyz"] = xyz
-        data_dict["vote_features"] = features
+        # data_dict["vote_features"] = features
 
         # --------- PROPOSAL GENERATION ---------
         data_dict = self.proposal(xyz, features, data_dict)

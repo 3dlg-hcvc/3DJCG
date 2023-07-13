@@ -60,14 +60,12 @@ def compute_vote_loss(data_dict):
     # Compute the min of min of distance
     vote_xyz_reshape = vote_xyz.view(batch_size * num_seed, -1,
                                      3)  # from B,num_seed*vote_factor,3 to B*num_seed,vote_factor,3
-    seed_gt_votes_reshape = seed_gt_votes.view(batch_size * num_seed, GT_VOTE_FACTOR,
-                                               3)  # from B,num_seed,3*GT_VOTE_FACTOR to B*num_seed,GT_VOTE_FACTOR,3
+    seed_gt_votes_reshape = seed_gt_votes.view(batch_size * num_seed, GT_VOTE_FACTOR, 3)  # from B,num_seed,3*GT_VOTE_FACTOR to B*num_seed,GT_VOTE_FACTOR,3
     # A predicted vote to no where is not penalized as long as there is a good vote near the GT vote.
     dist1, _, dist2, _ = nn_distance(vote_xyz_reshape, seed_gt_votes_reshape, l1=True)
     votes_dist, _ = torch.min(dist2, dim=1)  # (B*num_seed,vote_factor) to (B*num_seed,)
     votes_dist = votes_dist.view(batch_size, num_seed)
     vote_loss = torch.sum(votes_dist * seed_gt_votes_mask.float()) / (torch.sum(seed_gt_votes_mask.float()) + 1e-6)
-
     return vote_loss
 
 def compute_objectness_loss(data_dict):
@@ -88,7 +86,7 @@ def compute_objectness_loss(data_dict):
     gt_center = data_dict['center_label'][:, :, 0:3]
     B = gt_center.shape[0]
     K = aggregated_vote_xyz.shape[1]
-    K2 = gt_center.shape[1]
+    # K2 = gt_center.shape[1]
     dist1, ind1, dist2, _ = nn_distance(aggregated_vote_xyz, gt_center)  # dist1: BxK, dist2: BxK2
 
     # Generate objectness label and mask
@@ -226,13 +224,13 @@ def compute_box_and_sem_cls_loss(data_dict, config):
         sem_cls_loss
     """
 
-    num_heading_bin = config.num_heading_bin
-    num_size_cluster = config.num_size_cluster
-    num_class = config.num_class
-    mean_size_arr = config.mean_size_arr
+    # num_heading_bin = config.num_heading_bin
+    # num_size_cluster = config.num_size_cluster
+    # num_class = config.num_class
+    # mean_size_arr = config.mean_size_arr
 
     object_assignment = data_dict['object_assignment']
-    batch_size = object_assignment.shape[0]
+    # batch_size = object_assignment.shape[0]
 
     # Set assignment
     # (B,K) with values in 0,1,...,K2-1
