@@ -92,7 +92,7 @@ class Pointnet2Backbone(nn.Module):
         
         pointcloud = data_dict["point_clouds"]
 
-        batch_size = pointcloud.shape[0]
+        # batch_size = pointcloud.shape[0]
 
         xyz, features = self._break_up_pc(pointcloud)
 

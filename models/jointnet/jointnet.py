@@ -40,7 +40,7 @@ class JointNet(nn.Module):
         # Hough voting
         self.vgen = VotingModule(self.vote_factor, 256)
         self.proposal = ProposalModule(num_class, num_heading_bin, num_size_cluster, mean_size_arr, num_proposal,
-                                       sampling)
+                                       sampling, config=self.dataset_config)
         self.relation = RelationModule(num_proposals=num_proposal, det_channel=128)  # bef 256
 
 

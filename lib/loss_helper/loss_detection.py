@@ -117,9 +117,9 @@ def compute_box_loss(data_dict, config, distance_huber_loss_thres=0.15, use_cent
     gt_heading_class = data_dict['gt_assigned_heading_class']  # (B, N)
     gt_heading_residual = data_dict['gt_assigned_heading_residual']  # (B, N, 3)
     gt_distance = data_dict['gt_assigned_distance']  # (B, N, 6)
-    gt_centerness =  data_dict['gt_assigned_centerness'].view(-1)  # (B*N,)
+    # gt_centerness =  data_dict['gt_assigned_centerness'].view(-1)  # (B*N,)
     objectness_label =  data_dict['objectness_label'].float()  # (B, N)
-    objectness_mask = data_dict['objectness_mask'].float()  # (B, N)
+    # objectness_mask = data_dict['objectness_mask'].float()  # (B, N)
     batch_size = objectness_label.shape[0]
     num_proposal = objectness_label.shape[1]
 

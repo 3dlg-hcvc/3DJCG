@@ -110,33 +110,27 @@ class RelationModule(nn.Module):
 
             # multiview/rgb feature embedding
             if self.use_obj_embedding:
-                if not USE_GT:
-                    obj_feat = data_dict["point_clouds"][..., 6:6 + 128].permute(0, 2, 1)
+                obj_feat = data_dict["point_clouds"][..., 6:6 + 128].permute(0, 2, 1)
 
-                    obj_feat_dim = obj_feat.shape[1]
-                    obj_feat_id_seed = data_dict["seed_inds"]
-                    obj_feat_id_seed = obj_feat_id_seed.long() + (torch.arange(batch_size) * obj_feat.shape[1])[:, None].to("cuda")
-                    obj_feat_id_seed = obj_feat_id_seed.reshape(-1)
-                    obj_feat_id_vote = data_dict["aggregated_vote_inds"]
-                    obj_feat_id_vote = obj_feat_id_vote.long() + (
-                        (torch.arange(batch_size) * data_dict["seed_inds"].shape[1])[:, None].to(
-                            obj_feat_id_vote.device))
-                    obj_feat_id_vote = obj_feat_id_vote.reshape(-1)
-                    obj_feat_id = obj_feat_id_seed[obj_feat_id_vote]
-                    obj_feat = obj_feat.reshape(-1, obj_feat_dim)[obj_feat_id].reshape(batch_size, num_proposal, obj_feat_dim)
-                else:
-                    obj_feat = data_dict["obj_features"]
-
+                obj_feat_dim = obj_feat.shape[1]
+                obj_feat_id_seed = data_dict["seed_inds"]
+                obj_feat_id_seed = obj_feat_id_seed.long() + (torch.arange(batch_size) * obj_feat.shape[1])[:, None].to("cuda")
+                obj_feat_id_seed = obj_feat_id_seed.reshape(-1)
+                obj_feat_id_vote = data_dict["aggregated_vote_inds"]
+                obj_feat_id_vote = obj_feat_id_vote.long() + (
+                    (torch.arange(batch_size) * data_dict["seed_inds"].shape[1])[:, None].to(
+                        obj_feat_id_vote.device))
+                obj_feat_id_vote = obj_feat_id_vote.reshape(-1)
+                obj_feat_id = obj_feat_id_seed[obj_feat_id_vote]
+                obj_feat = obj_feat.reshape(-1, obj_feat_dim)[obj_feat_id].reshape(batch_size, num_proposal, obj_feat_dim)
 
                 obj_embedding = self.obj_embedding[i](obj_feat)
                 features = features + obj_embedding * 0.1
 
             # box embedding
             if self.use_box_embedding:
-                if not USE_GT:
-                    corners = data_dict['pred_bbox_corner']
-                else:
-                    corners = data_dict['pred_bbox_corner']
+                corners = data_dict['pred_bbox_corner']
+
                 centers = self._get_bbox_centers(corners)  # batch_size, num_proposals, 3
                 num_proposals = centers.shape[1]
                 # attention weight

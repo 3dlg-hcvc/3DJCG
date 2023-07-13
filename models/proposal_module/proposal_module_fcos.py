@@ -16,7 +16,7 @@ from macro import *
 
 
 class ProposalModule(nn.Module):
-    def __init__(self, num_class, num_heading_bin, num_size_cluster, mean_size_arr, num_proposal, sampling, seed_feat_dim=256):
+    def __init__(self, num_class, num_heading_bin, num_size_cluster, mean_size_arr, num_proposal, sampling, seed_feat_dim=256, config=None):
         super().__init__()
 
         self.num_class = num_class
@@ -26,7 +26,7 @@ class ProposalModule(nn.Module):
         self.num_proposal = num_proposal
         self.sampling = sampling
         self.seed_feat_dim = seed_feat_dim
-
+        self.config = config
         # Vote clustering
         self.vote_aggregation = PointnetSAModuleVotes(
             npoint=self.num_proposal,
@@ -62,7 +62,7 @@ class ProposalModule(nn.Module):
 
 
         # --------- PROPOSAL GENERATION ---------
-        data_dict = self.proposal(features, data_dict)
+        data_dict = self.proposal(features, data_dict, config=self.config, use_gt=USE_GT)
         data_dict = self.decode_scores(data_dict)
         # net = self.proposal(features)
         # data_dict = self.decode_scores(net, data_dict, self.num_class, self.num_heading_bin, self.num_size_cluster, self.mean_size_arr)
@@ -123,7 +123,7 @@ class ProposalModule(nn.Module):
         data_dict["pred_bbox_feature"] = data_dict["aggregated_vote_features"]
         # Not Useful
         data_dict["pred_bbox_mask"] = data_dict["objectness_scores"].argmax(-1)
-        data_dict["pred_bbox_sems"] = data_dict["sem_cls_scores"].argmax(-1)
+        # data_dict["pred_bbox_sems"] = data_dict["sem_cls_scores"].argmax(-1)
 
         return data_dict
 

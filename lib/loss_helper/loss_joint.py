@@ -53,6 +53,7 @@ def get_joint_loss(data_dict, device, config, weights,
         heading_cls_loss, heading_reg_loss, size_distance_loss, sem_cls_loss = compute_box_and_sem_cls_loss(data_dict, config)
         box_loss = 0.1 * heading_cls_loss + heading_reg_loss + 0.1 * sem_cls_loss + 20 * size_distance_loss
 
+
         # objectness; Nothing
         # obj_pred_val = torch.argmax(data_dict["objectness_scores"], 2) # B,K
         # obj_acc = torch.sum((obj_pred_val==data_dict["objectness_label"].long()).float()*data_dict["objectness_mask"])/(torch.sum(data_dict["objectness_mask"])+1e-6)

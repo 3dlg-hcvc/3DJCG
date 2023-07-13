@@ -37,18 +37,16 @@ def get_dataloader(args, scanrefer, scanrefer_new, all_scene_list, split, config
         scanrefer_all_scene=all_scene_list, 
         split=split,
         name=args.dataset,
-        num_points=args.num_points if not USE_GT else 50000,
+        num_points=args.num_points,
         use_color=args.use_color, 
-        use_height=(not args.no_height) if not USE_GT else False,
+        use_height=(not args.no_height),
         use_normal=args.use_normal, 
         use_multiview=args.use_multiview,
         lang_num_max=args.lang_num_max
     )
     print("evaluate on {} samples".format(len(dataset)))
-    if USE_GT:
-        dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, collate_fn=_collate_fn)
-    else:
-        dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
+
+    dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
 
 
     return dataset, dataloader

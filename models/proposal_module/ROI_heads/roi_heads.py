@@ -7,6 +7,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from lib.loss_helper.loss_detection import recover_assigned_gt_bboxes
+from utils.nn_distance import nn_distance
 import numpy as np
 import os
 import sys
@@ -96,6 +98,7 @@ class StandardROIHeads(nn.Module):
             self,
             ROI_features,
             data_dict,
+            config=None,
             use_gt=False
     ):
         batch_size, num_proposal, _ = ROI_features.shape
@@ -109,16 +112,48 @@ class StandardROIHeads(nn.Module):
             obj_scores = torch.gather(data_dict["vote_label_mask"], dim=1, index=final_fps_ind.long())
             new_obj_scores = torch.unsqueeze(obj_scores, dim=-1)
             pred_objectness_logits = torch.cat([1 - new_obj_scores, new_obj_scores], dim=-1)
+
+
         else:
             pred_objectness_logits = self.objectness_predictor(x).permute(0,2,1)
 
+
         # (batch_size, num_proposal, 6)
-        pred_box_reg = self.box_predictor(x).permute(0,2,1)
-        pred_box_reg = pred_box_reg.exp()  # add exp transform
+
+
 
         # (batch_size, num_proposal, num_heading_bin)
-        pred_heading_cls = self.heading_cls_predictor(x).permute(0,2,1)
-        pred_heading_reg = self.heading_reg_predictor(x).permute(0,2,1)
+        if use_gt:
+            aggregated_vote_xyz = data_dict['aggregated_vote_xyz']
+            gt_center = data_dict['center_label'][:, :, 0:3]
+
+            dist1, ind1, dist2, _ = nn_distance(aggregated_vote_xyz, gt_center)  # dist1: BxK, dist2: BxK2
+            object_assignment = ind1
+            gt_assigned_center, gt_assigned_heading_class, gt_assigned_heading_residual, gt_assigned_heading, gt_assigned_distance, \
+                inside_label, gt_assigned_centerness, gt_assigned_bbox_size = recover_assigned_gt_bboxes(data_dict,
+                                                                                                         config,
+                                                                                                         object_assignment)
+            # data_dict['gt_assigned_center'] = gt_assigned_center
+            # data_dict['gt_assigned_heading_residual'] = gt_assigned_heading_residual
+            # data_dict['gt_assigned_heading'] = gt_assigned_heading
+            # data_dict['gt_assigned_distance'] = gt_assigned_distance
+            # data_dict['gt_assigned_centerness'] = gt_assigned_centerness
+
+            pred_heading_cls = gt_assigned_heading_class.unsqueeze(dim=-1)
+            pred_heading_reg = (gt_assigned_heading_class / (np.pi/self.num_heading_bin)).unsqueeze(dim=-1)
+            # class
+            if self.num_class:
+                pred_sem_cls = self.sem_cls_predictor(x).permute(0, 2, 1)
+                data_dict['sem_cls_scores'] = pred_sem_cls
+
+            pred_box_reg = gt_assigned_distance
+        else:
+            pred_box_reg = self.box_predictor(x).permute(0, 2, 1)
+            pred_box_reg = pred_box_reg.exp()  # add exp transform
+
+            pred_heading_cls = self.heading_cls_predictor(x).permute(0, 2, 1)
+            pred_heading_reg = self.heading_reg_predictor(x).permute(0,2,1)
+        heading_residuals = pred_heading_reg * (np.pi / self.num_heading_bin)
 
         # class
         if self.num_class:
@@ -128,7 +163,7 @@ class StandardROIHeads(nn.Module):
         # store to data_dict dict
         data_dict['heading_scores'] = pred_heading_cls  # (B, N, num_heading_bin)
         data_dict['heading_residuals_normalized'] = pred_heading_reg  # (B, N, num_heading_bin)
-        data_dict['heading_residuals'] = pred_heading_reg * (np.pi / self.num_heading_bin)
+        data_dict['heading_residuals'] = heading_residuals
         data_dict['rois'] = pred_box_reg  # (B, N, 6)
         data_dict['objectness_scores'] = pred_objectness_logits  # (B, N, 2)
 
