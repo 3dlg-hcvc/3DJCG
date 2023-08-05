@@ -34,6 +34,13 @@ from macro import *
 SCANREFER_TRAIN = json.load(open(os.path.join(CONF.PATH.DATA, "multi3drefer_train.json")))
 SCANREFER_VAL = json.load(open(os.path.join(CONF.PATH.DATA, "multi3drefer_val.json")))
 SCAN2CAD_ROTATION = json.load(open(os.path.join(CONF.PATH.SCAN2CAD, "scannet_instance_rotations.json")))
+
+if SCANREFER_ENHANCE:
+    for item in SCANREFER_TRAIN:
+        item["object_id"] = 0
+    for item in SCANREFER_VAL:
+        item["object_id"] = 0
+
 # SCAN2CAD_ROTATION = None
 # constants
 DC = ScannetDatasetConfig()
