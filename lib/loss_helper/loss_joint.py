@@ -11,7 +11,7 @@ import os
 
 from lib.configs.config_joint import CONF
 from .loss_detection import compute_vote_loss, compute_objectness_loss, compute_box_loss, compute_box_and_sem_cls_loss
-from .loss_captioning import compute_cap_loss
+# from .loss_captioning import compute_cap_loss
 from .loss_grounding import compute_reference_loss, compute_lang_classification_loss
 
 FAR_THRESHOLD = 0.3
@@ -46,8 +46,8 @@ def get_joint_loss(data_dict, device, config, weights,
         data_dict["objectness_label"] = objectness_label
         data_dict["objectness_mask"] = objectness_mask
         data_dict["object_assignment"] = object_assignment
-        data_dict["pos_ratio"] = torch.sum(objectness_label.float())/float(total_num_proposal)
-        data_dict["neg_ratio"] = torch.sum(objectness_mask.float())/float(total_num_proposal) - data_dict["pos_ratio"]
+        # data_dict["pos_ratio"] = torch.sum(objectness_label.float())/float(total_num_proposal)
+        # data_dict["neg_ratio"] = torch.sum(objectness_mask.float())/float(total_num_proposal) - data_dict["pos_ratio"]
 
         # Box loss and sem cls loss
         heading_cls_loss, heading_reg_loss, size_distance_loss, sem_cls_loss = compute_box_and_sem_cls_loss(data_dict, config)

@@ -288,6 +288,11 @@ def get_scanrefer(args):
     else:
         raise ValueError("Invalid dataset.")
 
+    if SCANREFER_ENHANCE:
+        for item in scanrefer_train:
+            item["object_id"] = 0
+        for item in scanrefer_eval_val:
+            item["object_id"] = 0
     if args.debug:
         scanrefer_train = [SCANREFER_TRAIN[0]]
         # scanrefer_eval_train = [SCANREFER_TRAIN[0]]

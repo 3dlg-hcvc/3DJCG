@@ -145,6 +145,7 @@ class ReferenceDataset(Dataset):
         label_main = {}
         for data in self.scanrefer:
             scene_id = data["scene_id"]
+
             object_id = data["object_id"]
             ann_id = data["ann_id"]
             object_name = data["object_name"]
