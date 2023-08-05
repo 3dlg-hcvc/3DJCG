@@ -37,9 +37,13 @@ SCAN2CAD_ROTATION = json.load(open(os.path.join(CONF.PATH.SCAN2CAD, "scannet_ins
 
 if SCANREFER_ENHANCE:
     for item in SCANREFER_TRAIN:
-        item["object_id"] = 0
+        item["object_id"] = -1
+        if len(item["object_ids"]) > 0:
+            item["object_id"] = item["object_ids"][0]
     for item in SCANREFER_VAL:
-        item["object_id"] = 0
+        item["object_id"] = -1
+        if len(item["object_ids"]) > 0:
+            item["object_id"] = item["object_ids"][0]
 
 # SCAN2CAD_ROTATION = None
 # constants
@@ -297,9 +301,13 @@ def get_scanrefer(args):
 
     if SCANREFER_ENHANCE:
         for item in scanrefer_train:
-            item["object_id"] = 0
+            item["object_id"] = -1
+            if len(item["object_ids"]) > 0:
+                item["object_id"] = item["object_ids"][0]
         for item in scanrefer_eval_val:
-            item["object_id"] = 0
+            item["object_id"] = -1
+            if len(item["object_ids"]) > 0:
+                item["object_id"] = item["object_ids"][0]
     if args.debug:
         scanrefer_train = [SCANREFER_TRAIN[0]]
         # scanrefer_eval_train = [SCANREFER_TRAIN[0]]
