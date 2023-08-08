@@ -511,6 +511,8 @@ if __name__ == "__main__":
     
     parser.add_argument("--debug", action="store_true", help="Debug mode.")
     args = parser.parse_args()
+    if USE_GT:
+        args.num_proposals = 128
 
     # # setting
     # os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu

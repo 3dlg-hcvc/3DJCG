@@ -30,7 +30,7 @@ class VotingModule(nn.Module):
         self.bn1 = torch.nn.BatchNorm1d(self.in_dim)
         self.bn2 = torch.nn.BatchNorm1d(self.in_dim)
         
-    def forward(self, data_dict, seed_xyz, seed_features, use_gt=False):
+    def forward(self, data_dict, seed_xyz, seed_features):
         """ Forward pass.
 
         Arguments:
@@ -48,14 +48,8 @@ class VotingModule(nn.Module):
         net = self.conv3(net) # (batch_size, (3+out_dim)*vote_factor, num_seed)
 
         net = net.transpose(2,1).view(batch_size, num_seed, self.vote_factor, 3+self.out_dim).contiguous()
-        if use_gt:
-            seed_inds = data_dict['seed_inds'].long()
-            # seed_gt_votes_mask = torch.gather(data_dict['vote_label_mask'], 1, seed_inds)
-            seed_inds_expand = seed_inds.view(batch_size, num_seed, 1).repeat(1, 1, 3)
-            seed_gt_votes = torch.gather(data_dict['vote_label'][:, :, 0:3], 1, seed_inds_expand)
-            offset = seed_gt_votes.unsqueeze(2)
-        else:
-            offset = net[:,:,:,0:3]
+
+        offset = net[:,:,:,0:3]
         vote_xyz = seed_xyz.unsqueeze(2) + offset
         vote_xyz = vote_xyz.contiguous().view(batch_size, num_vote, 3)
         

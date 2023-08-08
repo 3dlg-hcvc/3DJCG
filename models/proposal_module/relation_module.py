@@ -109,7 +109,7 @@ class RelationModule(nn.Module):
                 attention_matrix_way = 'mul'
 
             # multiview/rgb feature embedding
-            if self.use_obj_embedding:
+            if self.use_obj_embedding and not USE_GT:
                 obj_feat = data_dict["point_clouds"][..., 6:6 + 128].permute(0, 2, 1)
 
                 obj_feat_dim = obj_feat.shape[1]

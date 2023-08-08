@@ -24,7 +24,10 @@ from macro import *
 
 # data setting
 DC = ScannetDatasetConfig()
-MAX_NUM_OBJ = 256
+if not USE_GT:
+    MAX_NUM_OBJ = 256
+else:
+    MAX_NUM_OBJ = 128
 MEAN_COLOR_RGB = np.array([109.8, 97.2, 83.8])
 OBJ_CLASS_IDS = np.array([3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40]) # exclude wall (1), floor (2), ceiling (22)
 
@@ -385,6 +388,8 @@ class ReferenceDataset(Dataset):
             self.scene_data[scene_id]["semantic_labels"] = np.load(os.path.join(CONF.PATH.SCANNET_DATA, scene_id)+"_sem_label.npy")
             # self.scene_data[scene_id]["instance_bboxes"] = np.load(os.path.join(CONF.PATH.SCANNET_DATA, scene_id)+"_bbox.npy")
             self.scene_data[scene_id]["instance_bboxes"] = np.load(os.path.join(CONF.PATH.SCANNET_DATA, scene_id)+"_aligned_bbox.npy")
+            self.scene_data[scene_id]["instance_single_objs_idx"] = np.load(
+                os.path.join(CONF.PATH.SCANNET_DATA, scene_id) + "_aligned_single_obj_idx.npy")
 
         # prepare class mapping
         # lines = [line.rstrip() for line in open(SCANNET_V2_TSV)]
@@ -594,6 +599,7 @@ class ScannetReferenceDataset(ReferenceDataset):
         instance_labels = self.scene_data[scene_id]["instance_labels"]
         semantic_labels = self.scene_data[scene_id]["semantic_labels"]
         instance_bboxes = self.scene_data[scene_id]["instance_bboxes"]
+        single_objs_idx = self.scene_data[scene_id]["instance_single_objs_idx"]
 
         if not self.use_color:
             point_cloud = mesh_vertices[:,0:3] # do not use color for now
@@ -619,7 +625,16 @@ class ScannetReferenceDataset(ReferenceDataset):
         if self.use_height:
             floor_height = np.percentile(point_cloud[:,2],0.99)
             height = point_cloud[:,2] - floor_height
-            point_cloud = np.concatenate([point_cloud, np.expand_dims(height, 1)],1) 
+            point_cloud = np.concatenate([point_cloud, np.expand_dims(height, 1)],1)
+
+        if USE_GT:
+            all_objs = np.zeros(shape=(MAX_NUM_OBJ, 1024, 135), dtype=np.float32)
+            for i, inst_i in enumerate(single_objs_idx):
+                selected_points = point_cloud[inst_i]
+                n_points = len(selected_points)
+                selected = np.random.choice(n_points, 1024, replace=n_points < 1024)
+                all_objs[i] = selected_points[selected]
+                all_objs[i,:, 0:3] = all_objs[i,:, 0:3] - all_objs[i,:, 0:3].mean(axis=0)
         
         point_cloud, choices = random_sampling(point_cloud, self.num_points, return_choices=True)        
         instance_labels = instance_labels[choices]
@@ -843,6 +858,8 @@ class ScannetReferenceDataset(ReferenceDataset):
         data_dict["scene_id"] = scene_id
         data_dict["lang_num"] = np.array(lang_num).astype(np.int64)
         data_dict["point_clouds"] = point_cloud.astype(np.float32) # point cloud data including features
+        if USE_GT:
+            data_dict["single_obj_info"] = all_objs
         data_dict["lang_feat"] = lang_feat.astype(np.float32) # language feature vectors
         data_dict["lang_len"] = np.array(lang_len).astype(np.int64) # length of each description
         data_dict["lang_ids"] = np.array(self.lang_ids[scene_id][int(object_id)][ann_id]).astype(np.int64)
@@ -852,7 +869,7 @@ class ScannetReferenceDataset(ReferenceDataset):
         data_dict["heading_residual_label"] = angle_residuals.astype(np.float32) # (MAX_NUM_OBJ,)
         data_dict["size_class_label"] = size_classes.astype(np.int64) # (MAX_NUM_OBJ,) with int values in 0,...,NUM_SIZE_CLUSTER
         data_dict["size_residual_label"] = size_residuals.astype(np.float32) # (MAX_NUM_OBJ, 3)
-        data_dict["pred_size"] = box_size.astype(np.float32)
+        data_dict["gt_size"] = box_size.astype(np.float32)
         data_dict["num_bbox"] = np.array(num_bbox).astype(np.int64)
         data_dict["sem_cls_label"] = target_bboxes_semcls.astype(np.int64) # (MAX_NUM_OBJ,) semantic class index
 

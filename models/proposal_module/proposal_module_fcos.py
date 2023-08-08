@@ -5,7 +5,7 @@ Modified from: https://github.com/facebookresearch/votenet/blob/master/models/pr
 import torch
 import torch.nn as nn
 import numpy as np
-
+from lib.configs.config_joint import CONF
 
 
 from lib.pointnet2.pointnet2_modules import PointnetSAModuleVotes
@@ -51,19 +51,53 @@ class ProposalModule(nn.Module):
         """
 
         # Farthest point sampling (FPS) on votes
+        if not USE_GT:
+            xyz, features, fps_inds = self.vote_aggregation(xyz, features)
 
-        xyz, features, fps_inds = self.vote_aggregation(xyz, features)
+            sample_inds = fps_inds
 
-        sample_inds = fps_inds
+            data_dict['aggregated_vote_xyz'] = xyz # (batch_size, num_proposal, 3)
+            data_dict['aggregated_vote_features'] = features.permute(0, 2, 1).contiguous() # (batch_size, num_proposal, 128)
+            data_dict['aggregated_vote_inds'] = sample_inds # (batch_size, num_proposal,) # should be 0,1,2,...,num_proposal
+            # --------- PROPOSAL GENERATION ---------
+            data_dict = self.proposal(features, data_dict, config=self.config)
+            data_dict = self.decode_scores(data_dict)
+        else:
 
-        data_dict['aggregated_vote_xyz'] = xyz # (batch_size, num_proposal, 3)
-        data_dict['aggregated_vote_features'] = features.permute(0, 2, 1).contiguous() # (batch_size, num_proposal, 128)
-        data_dict['aggregated_vote_inds'] = sample_inds # (batch_size, num_proposal,) # should be 0,1,2,...,num_proposal
+            xyz = data_dict['center_label'][:, :, 0:3]
+            data_dict['aggregated_vote_xyz'] = xyz
+            data_dict['aggregated_vote_features'] = features
+            features = features.permute(0, 2, 1)
+            data_dict["pred_bbox_feature"] = data_dict["aggregated_vote_features"]
+
+            # gt_bboxes_centers = data_dict["center_label"].cpu().numpy()
+            # gt_heading_class_labels = data_dict["heading_class_label"].cpu().numpy()
+            # gt_heading_residual_labels = data_dict["heading_residual_label"].cpu().numpy()
+            # gt_size_class_labels = data_dict["size_class_label"].cpu().numpy()
+            # gt_bboxes_residuals = data_dict["size_residual_label"].cpu().numpy()
+            #
+            # gt_obb_batch_new = self.config.param2obb_batch(gt_bboxes_centers, gt_heading_class_labels,
+            #                                           gt_heading_residual_labels,
+            #                                           gt_size_class_labels, gt_bboxes_residuals)
+            # pred_bboxes = get_3d_box_batch(gt_obb_batch_new[:, 3:6], gt_obb_batch_new[:, 6],
+            #                                      gt_obb_batch_new[:, 0:3])
+
+            # batch_size, num_proposals, 8, 3
+
+            data_dict['pred_heading'] = torch.zeros(size=(data_dict["heading_class_label"].shape[0], data_dict["heading_class_label"].shape[1]), dtype=torch.float32, device="cuda")
+            data_dict['pred_center'] = data_dict["center_label"]
+            data_dict["pred_size"] = data_dict["gt_size"]
+
+            pred_heading = data_dict['pred_heading'].detach().cpu().numpy()  # B,num_proposal
+            pred_center = data_dict['pred_center'].detach().cpu().numpy()  # (B, num_proposal)
+            pred_box_size = data_dict['pred_size'].detach().cpu().numpy()  # (B, num_proposal, 3)
+
+            pred_bboxes = get_3d_box_batch(pred_box_size, pred_heading, pred_center)
+            pred_bboxes = torch.from_numpy(pred_bboxes).float().to(
+                "cuda")  # .reshape(bsize, num_proposal, 8, 3)
+            data_dict['pred_bbox_corner'] = pred_bboxes
 
 
-        # --------- PROPOSAL GENERATION ---------
-        data_dict = self.proposal(features, data_dict, config=self.config, use_gt=USE_GT)
-        data_dict = self.decode_scores(data_dict)
         # net = self.proposal(features)
         # data_dict = self.decode_scores(net, data_dict, self.num_class, self.num_heading_bin, self.num_size_cluster, self.mean_size_arr)
 

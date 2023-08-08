@@ -83,7 +83,11 @@ def compute_reference_loss(data_dict, config, no_reference=False):
     loss = 0.
     gt_labels = np.zeros((batch_size, len_nun_max, num_proposals))
     for i in range(batch_size):
-        objectness_masks = data_dict['objectness_scores'].max(2)[1].float().cpu().numpy() # batch_size, num_proposals
+        if not USE_GT:
+            objectness_masks = data_dict['objectness_scores'].max(2)[
+                1].float().cpu().numpy()  # batch_size, num_proposals
+        else:
+            objectness_masks = data_dict["tmp_objectness_masks"].squeeze().float().cpu().numpy()
 
         gt_obb_batch = config.param2obb_batch(gt_center_list[i][:, 0:3], gt_heading_class_list[i],
                                               gt_heading_residual_list[i],

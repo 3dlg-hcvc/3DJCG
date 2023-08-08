@@ -99,7 +99,6 @@ class StandardROIHeads(nn.Module):
             ROI_features,
             data_dict,
             config=None,
-            use_gt=False
     ):
         batch_size, num_proposal, _ = ROI_features.shape
 
@@ -107,15 +106,15 @@ class StandardROIHeads(nn.Module):
         x = self.convs(ROI_features)
 
         # (batch_size, num_proposal, 2)
-        if use_gt:
-            final_fps_ind = torch.gather(data_dict["seed_inds"], dim=1, index=data_dict['aggregated_vote_inds'].long())
-            obj_scores = torch.gather(data_dict["vote_label_mask"], dim=1, index=final_fps_ind.long())
-            new_obj_scores = torch.unsqueeze(obj_scores, dim=-1)
-            pred_objectness_logits = torch.cat([1 - new_obj_scores, new_obj_scores], dim=-1)
-
-
-        else:
-            pred_objectness_logits = self.objectness_predictor(x).permute(0,2,1)
+        # if use_gt:
+        #     final_fps_ind = torch.gather(data_dict["seed_inds"], dim=1, index=data_dict['aggregated_vote_inds'].long())
+        #     obj_scores = torch.gather(data_dict["vote_label_mask"], dim=1, index=final_fps_ind.long())
+        #     new_obj_scores = torch.unsqueeze(obj_scores, dim=-1)
+        #     pred_objectness_logits = torch.cat([1 - new_obj_scores, new_obj_scores], dim=-1)
+        #
+        #
+        # else:
+        pred_objectness_logits = self.objectness_predictor(x).permute(0,2,1)
 
 
         # (batch_size, num_proposal, 6)
@@ -123,36 +122,36 @@ class StandardROIHeads(nn.Module):
 
 
         # (batch_size, num_proposal, num_heading_bin)
-        if use_gt:
-            aggregated_vote_xyz = data_dict['aggregated_vote_xyz']
-            gt_center = data_dict['center_label'][:, :, 0:3]
+        # if use_gt:
+        #     aggregated_vote_xyz = data_dict['aggregated_vote_xyz']
+        #     gt_center = data_dict['center_label'][:, :, 0:3]
+        #
+        #     dist1, ind1, dist2, _ = nn_distance(aggregated_vote_xyz, gt_center)  # dist1: BxK, dist2: BxK2
+        #     object_assignment = ind1
+        #     gt_assigned_center, gt_assigned_heading_class, gt_assigned_heading_residual, gt_assigned_heading, gt_assigned_distance, \
+        #         inside_label, gt_assigned_centerness, gt_assigned_bbox_size = recover_assigned_gt_bboxes(data_dict,
+        #                                                                                                  config,
+        #                                                                                                  object_assignment)
+        #     # data_dict['gt_assigned_center'] = gt_assigned_center
+        #     # data_dict['gt_assigned_heading_residual'] = gt_assigned_heading_residual
+        #     # data_dict['gt_assigned_heading'] = gt_assigned_heading
+        #     # data_dict['gt_assigned_distance'] = gt_assigned_distance
+        #     # data_dict['gt_assigned_centerness'] = gt_assigned_centerness
+        #
+        #     pred_heading_cls = gt_assigned_heading_class.unsqueeze(dim=-1)
+        #     pred_heading_reg = (gt_assigned_heading_class / (np.pi/self.num_heading_bin)).unsqueeze(dim=-1)
+        #     # class
+        #     if self.num_class:
+        #         pred_sem_cls = self.sem_cls_predictor(x).permute(0, 2, 1)
+        #         data_dict['sem_cls_scores'] = pred_sem_cls
+        #
+        #     pred_box_reg = gt_assigned_distance
+        # else:
+        pred_box_reg = self.box_predictor(x).permute(0, 2, 1)
+        pred_box_reg = pred_box_reg.exp()  # add exp transform
 
-            dist1, ind1, dist2, _ = nn_distance(aggregated_vote_xyz, gt_center)  # dist1: BxK, dist2: BxK2
-            object_assignment = ind1
-            gt_assigned_center, gt_assigned_heading_class, gt_assigned_heading_residual, gt_assigned_heading, gt_assigned_distance, \
-                inside_label, gt_assigned_centerness, gt_assigned_bbox_size = recover_assigned_gt_bboxes(data_dict,
-                                                                                                         config,
-                                                                                                         object_assignment)
-            # data_dict['gt_assigned_center'] = gt_assigned_center
-            # data_dict['gt_assigned_heading_residual'] = gt_assigned_heading_residual
-            # data_dict['gt_assigned_heading'] = gt_assigned_heading
-            # data_dict['gt_assigned_distance'] = gt_assigned_distance
-            # data_dict['gt_assigned_centerness'] = gt_assigned_centerness
-
-            pred_heading_cls = gt_assigned_heading_class.unsqueeze(dim=-1)
-            pred_heading_reg = (gt_assigned_heading_class / (np.pi/self.num_heading_bin)).unsqueeze(dim=-1)
-            # class
-            if self.num_class:
-                pred_sem_cls = self.sem_cls_predictor(x).permute(0, 2, 1)
-                data_dict['sem_cls_scores'] = pred_sem_cls
-
-            pred_box_reg = gt_assigned_distance
-        else:
-            pred_box_reg = self.box_predictor(x).permute(0, 2, 1)
-            pred_box_reg = pred_box_reg.exp()  # add exp transform
-
-            pred_heading_cls = self.heading_cls_predictor(x).permute(0, 2, 1)
-            pred_heading_reg = self.heading_reg_predictor(x).permute(0,2,1)
+        pred_heading_cls = self.heading_cls_predictor(x).permute(0, 2, 1)
+        pred_heading_reg = self.heading_reg_predictor(x).permute(0,2,1)
         heading_residuals = pred_heading_reg * (np.pi / self.num_heading_bin)
 
         # class
