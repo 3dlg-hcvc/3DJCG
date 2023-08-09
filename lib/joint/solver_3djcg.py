@@ -734,6 +734,7 @@ class Solver():
         #if (not is_eval) or phase == "val":
 
             for i, data_dict in enumerate(tqdm(dataloader)):
+                torch.cuda.empty_cache()
                 # move to cuda
                 for key in data_dict:
                     # data_dict[key] = data_dict[key].cuda()
@@ -856,6 +857,7 @@ class Solver():
                 total_gt = {}
                 best_model_f1 = 0
                 for data_dict in tqdm(dataloader):
+                    torch.cuda.empty_cache()
                     # move to cuda
                     for key in data_dict:
                         # data_dict[key] = data_dict[key].cuda()
